@@ -31,6 +31,14 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
+// Legacy .html paths -> clean equivalents. 301 so bookmarks/links age out gracefully.
+const LEGACY_REDIRECTS = {
+  '/index.html': '/',
+  '/pages/login.html': '/invite',
+  '/pages/settings.html': '/settings',
+  '/pages/handbook.html': '/handbook',
+};
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
   res.end(body);
@@ -38,6 +46,11 @@ function send(res, status, body, headers = {}) {
 
 function sendJson(res, status, obj) {
   send(res, status, JSON.stringify(obj), { 'Content-Type': 'application/json; charset=utf-8' });
+}
+
+function redirect(res, location) {
+  res.writeHead(301, { Location: location });
+  res.end();
 }
 
 async function readJsonBody(req) {
@@ -240,20 +253,26 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/categories') return await handleCategories(req, res, url);
     if (pathname === '/api/items') return await handleItems(req, res, url);
 
-    if (pathname === '/' || pathname === '/index.html') {
+    // Legacy .html paths redirect to their clean equivalents.
+    if (LEGACY_REDIRECTS[pathname]) return redirect(res, LEGACY_REDIRECTS[pathname]);
+
+    if (pathname === '/') {
       return serveFile(res, path.join(__dirname, 'index.html'));
     }
 
-    if (pathname === '/pages/login.html') {
-      return serveFile(res, path.join(__dirname, 'pages', 'login.html'));
-    }
-
-    if (pathname === '/pages/settings.html') {
+    if (pathname === '/settings') {
       return serveFile(res, path.join(__dirname, 'pages', 'settings.html'));
     }
 
-    if (pathname === '/pages/handbook.html') {
+    if (pathname === '/handbook') {
       return serveFile(res, path.join(__dirname, 'pages', 'handbook.html'));
+    }
+
+    // /invite accepts an optional trailing code segment, e.g. /invite/GAMER1,
+    // so invite links can be shared as a single clickable URL. The code
+    // itself is read client-side from location.pathname and pre-filled.
+    if (pathname === '/invite' || /^\/invite\/[^/]+$/.test(pathname)) {
+      return serveFile(res, path.join(__dirname, 'pages', 'login.html'));
     }
 
     if (
