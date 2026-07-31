@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WayStone</title>
+
+<script>
+(function () {
+  var theme = 'default';
+  try { theme = localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) {}
+  document.write('<link rel="stylesheet" href="/style/' + theme + '.css" id="theme-css" />');
+})();
+</script>
+<link rel="stylesheet" href="/style/base.css" />
+
+<style>
+  body { display: flex; height: 100vh; overflow: hidden; }
+  #app-shell { display: flex; width: 100%; height: 100%; }
+  .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-scroll { flex: 1; overflow-y: auto; padding: 24px; }
+  .card-grid-wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+</style>
+</head>
+<body>
+
+<div id="login-gate" style="display:none">
+  <div class="centered">
+    <div class="panel panel-narrow">
+      <h2 style="margin-bottom:18px">Log in to WayStone</h2>
+      <form id="login-form">
+        <div class="field" style="margin-bottom:12px">
+          <label class="field-label" for="login-username">Username</label>
+          <input class="input" type="text" id="login-username" autocomplete="username" autofocus />
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label class="field-label" for="login-password">Master password</label>
+          <input class="input" type="password" id="login-password" autocomplete="current-password" />
+        </div>
+        <div id="login-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin-bottom:10px"></div>
+        <button class="btn btn-primary btn-block" type="submit">Log in</button>
+      </form>
+      <div style="text-align:center;margin-top:16px">
+        <a href="/pages/handbook.html" style="font-size:12.5px;color:var(--text-muted);text-decoration:none">How WayStone works</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="unlock-gate" style="display:none">
+  <div class="centered">
+    <div class="panel panel-narrow">
+      <h2 style="margin-bottom:6px">Unlock WayStone</h2>
+      <p class="muted" style="font-size:13px;margin-bottom:18px">Logged in as <strong id="unlock-username-label"></strong></p>
+      <form id="unlock-form">
+        <div class="field" style="margin-bottom:12px">
+          <label class="field-label" for="unlock-password">Master password</label>
+          <input class="input" type="password" id="unlock-password" autocomplete="current-password" autofocus />
+        </div>
+        <div id="unlock-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin-bottom:10px"></div>
+        <button class="btn btn-primary btn-block" type="submit">Unlock</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="app-shell" style="display:none">
+  <div class="sidebar" id="app-sidebar">
+    <div class="sidebar-head">
+      <div class="brand" style="font-size:14px">
+        <span class="brand-mark" style="width:16px">
+          <svg viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:18px">
+            <path d="M10 1 L18 7 L18 23 L2 23 L2 7 Z" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M6.5 13.5 L13.5 13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        WayStone
+      </div>
+      <button class="btn btn-icon btn-ghost" style="width:26px;height:26px" onclick="document.getElementById('app-sidebar').classList.toggle('collapsed')" title="Toggle sidebar">☰</button>
+    </div>
+    <div class="sidebar-list" id="sidebar-list"></div>
+    <div class="sidebar-foot">
+      <button class="btn btn-ghost btn-block btn-sm" id="add-category-btn">+ New category</button>
+      <a class="btn btn-ghost btn-block btn-sm" href="/pages/settings.html" style="text-decoration:none;text-align:center">⚙ Settings</a>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" id="lock-btn" style="flex:1">🔒 Lock</button>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" style="flex:1">Log out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">WayStone</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" id="add-item-btn">+ New item</button>
+      </div>
+    </div>
+    <div class="main-scroll">
+      <div class="card-grid-wrap" id="card-grid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="item-modal-backdrop" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Item</h2>
+      <button class="btn btn-icon btn-ghost" onclick="document.getElementById('item-modal-backdrop').style.display='none'">✕</button>
+    </div>
+    <div id="item-modal-body"></div>
+  </div>
+</div>
+
+<script type="module" src="/core/client/app.js"></script>
+
+</body>
+</html>
