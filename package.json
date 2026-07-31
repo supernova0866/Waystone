@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "generate-hash": "node scripts/generate-hash.js",
-    "validate-themes": "node scripts/validate-themes.js"
+    "validate-themes": "node scripts/validate-themes.cjs"
   },
   "dependencies": {
     "argon2": "^0.41.1"
