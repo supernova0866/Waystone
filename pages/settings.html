@@ -5,13 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>WayStone — Settings</title>
 
-<script>
-(function () {
-  var theme = 'default';
-  try { theme = localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) {}
-  document.write('<link rel="stylesheet" href="/style/' + theme + '.css" id="theme-css" />');
-})();
-</script>
+<script src="/core/client/theme-loader.js"></script>
 <link rel="stylesheet" href="/style/base.css" />
 
 <style>
@@ -140,7 +134,7 @@ import { checkSession, fetchCategories, createCategory, saveCategory, deleteCate
 import { unlockVault, encryptItemData, decryptItemData } from '/core/client/crypto.js';
 import { buildIsel } from '/core/client/isel.js';
 import { newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES } from '/core/client/categories.js';
-import { initParticles, setParticlesEnabled } from '/core/client/particles.js';
+import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
 
 let themes = [];
 let session = { authenticated: false };
@@ -164,6 +158,7 @@ async function loadThemeCards() {
       try { localStorage.setItem('waystone-preview-theme', id); } catch (e) {}
       document.getElementById('theme-css').setAttribute('href', `/style/${id}.css`);
       wrap.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', c === card));
+      refreshParticlesForTheme();
     });
   });
 }
