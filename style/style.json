@@ -1,7 +1,25 @@
 [
-  { "id": "default", "name": "Stone",   "file": "default.css", "swatches": ["#17161b", "#8a9a7c", "#a3b494"] },
-  { "id": "dusk",     "name": "Dusk",    "file": "dusk.css",    "swatches": ["#100f1a", "#8b7ff0", "#a599f7"] },
-  { "id": "verdant",  "name": "Verdant", "file": "verdant.css", "swatches": ["#0d1710", "#6fcf7a", "#8fe097"] },
-  { "id": "ember",    "name": "Ember",   "file": "ember.css",   "swatches": ["#150e09", "#e08a3c", "#f2a054"] },
-  { "id": "frost",    "name": "Frost",   "file": "frost.css",   "swatches": ["#f3f6f8", "#2f8fd1", "#1f77b8"] }
+  { "id": "default",    "name": "Stone",       "file": "default.css",    "swatches": ["#17161b", "#8a9a7c", "#a3b494"] },
+  { "id": "dusk",       "name": "Dusk",        "file": "dusk.css",       "swatches": ["#100f1a", "#8b7ff0", "#a599f7"] },
+  { "id": "verdant",    "name": "Verdant",     "file": "verdant.css",    "swatches": ["#0d1710", "#6fcf7a", "#8fe097"] },
+  { "id": "ember",      "name": "Ember",       "file": "ember.css",      "swatches": ["#150e09", "#e08a3c", "#f2a054"] },
+  { "id": "frost",      "name": "Frost",       "file": "frost.css",      "swatches": ["#f3f6f8", "#2f8fd1", "#1f77b8"] },
+  { "id": "meadows",    "name": "Meadows",     "file": "meadows.css",    "swatches": ["#f4f8f2", "#4c9a4c", "#3d813d"] },
+  { "id": "bw",         "name": "B&W",         "file": "bw.css",        "swatches": ["#0d0d0d", "#e6e6e6", "#ffffff"] },
+  { "id": "vivid-blue",  "name": "Vivid Blue",  "file": "vivid-blue.css",  "swatches": ["#0a1120", "#2f6bff", "#5c8bff"] },
+  { "id": "vantablack",  "name": "Vantablack",  "file": "vantablack.css",  "swatches": ["#000000", "#d6ff3f", "#e6ff70"] },
+  { "id": "rgb-dark",   "name": "RGB Dark",    "file": "rgb-dark.css",   "swatches": ["#121214", "#ff3b5c", "#3bcfff"] },
+  { "id": "rgb-light",  "name": "RGB Light",   "file": "rgb-light.css",  "swatches": ["#f7f7fa", "#e0304f", "#1f8fc9"] },
+  {
+    "id": "cosmic",
+    "name": "Cosmic",
+    "file": "cosmic.css",
+    "swatches": ["#05040d", "#7c6cff", "#9d8dff"],
+    "particles": {
+      "layers": [
+        { "type": "twinkle", "color": "text-strong", "count": 70, "opacity": [0.15, 0.65], "twinkleSpeed": 0.018 },
+        { "type": "streak", "color": "accent", "frequency": [7000, 18000], "speed": 9, "length": 90, "opacity": 0.85 }
+      ]
+    }
+  }
 ]
