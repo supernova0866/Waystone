@@ -5,13 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>WayStone</title>
 
-<script>
-(function () {
-  var theme = 'default';
-  try { theme = localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) {}
-  document.write('<link rel="stylesheet" href="/style/' + theme + '.css" id="theme-css" />');
-})();
-</script>
+<script src="/core/client/theme-loader.js"></script>
 <link rel="stylesheet" href="/style/base.css" />
 
 <style>
@@ -41,7 +35,7 @@
         <button class="btn btn-primary btn-block" type="submit">Log in</button>
       </form>
       <div style="text-align:center;margin-top:16px">
-        <a href="/pages/handbook.html" style="font-size:12.5px;color:var(--text-muted);text-decoration:none">How WayStone works</a>
+        <a href="/handbook" style="font-size:12.5px;color:var(--text-muted);text-decoration:none">How WayStone works</a>
       </div>
     </div>
   </div>
@@ -81,7 +75,7 @@
     <div class="sidebar-list" id="sidebar-list"></div>
     <div class="sidebar-foot">
       <button class="btn btn-ghost btn-block btn-sm" id="add-category-btn">+ New category</button>
-      <a class="btn btn-ghost btn-block btn-sm" href="/pages/settings.html" style="text-decoration:none;text-align:center">⚙ Settings</a>
+      <a class="btn btn-ghost btn-block btn-sm" href="/settings" style="text-decoration:none;text-align:center">⚙ Settings</a>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost btn-sm" id="lock-btn" style="flex:1">🔒 Lock</button>
         <button class="btn btn-ghost btn-sm" id="logout-btn" style="flex:1">Log out</button>
