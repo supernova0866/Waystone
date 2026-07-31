@@ -5,13 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>WayStone — Accept Invite</title>
 
-<script>
-(function () {
-  var theme = 'default';
-  try { theme = localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) {}
-  document.write('<link rel="stylesheet" href="/style/' + theme + '.css" id="theme-css" />');
-})();
-</script>
+<script src="/core/client/theme-loader.js"></script>
 <link rel="stylesheet" href="/style/base.css" />
 
 <style>
@@ -71,7 +65,7 @@
     </div>
 
     <div class="invite-footer">
-      <a href="/pages/handbook.html">How WayStone works</a>
+      <a href="/handbook">How WayStone works</a>
     </div>
   </div>
 </div>
@@ -100,6 +94,14 @@ const successBlock = document.getElementById('success-block');
 codeInput.addEventListener('input', () => {
   codeInput.value = codeInput.value.toUpperCase();
 });
+
+// Pretty URL support: an invite shared as /invite/CODE pre-fills the code
+// field and checks it immediately, so the link itself is a one-click invite.
+const inviteCodeFromPath = window.location.pathname.match(/^\/invite\/([^/]+)$/);
+if (inviteCodeFromPath) {
+  codeInput.value = decodeURIComponent(inviteCodeFromPath[1]).trim().toUpperCase();
+  codeForm.requestSubmit();
+}
 
 codeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
