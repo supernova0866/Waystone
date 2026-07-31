@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WayStone — Settings</title>
+
+<script>
+(function () {
+  var theme = 'default';
+  try { theme = localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) {}
+  document.write('<link rel="stylesheet" href="/style/' + theme + '.css" id="theme-css" />');
+})();
+</script>
+<link rel="stylesheet" href="/style/base.css" />
+
+<style>
+  .settings-shell { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
+  .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  .settings-section { margin-bottom: 48px; }
+  .settings-section-title {
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .locked-note { font-size: 13px; color: var(--text-muted); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+  .category-block { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+  .category-block-head { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .invite-result { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); font-family: var(--font-mono); margin-top: 10px; }
+  .users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .users-table th, .users-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .users-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .danger-zone { border: 1px solid var(--danger); border-radius: var(--radius-lg); padding: 16px; }
+</style>
+</head>
+<body>
+
+<div class="settings-shell">
+  <div class="settings-header">
+    <h1>Settings</h1>
+    <a href="/" class="btn btn-ghost btn-sm" style="text-decoration:none">← Back to WayStone</a>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title">Appearance</div>
+    <div class="theme-grid" id="theme-cards"></div>
+    <div class="toggle-row" style="margin-top:16px">
+      <div>
+        <div style="font-size:13.5px">Background effects</div>
+        <div class="hint" style="margin-top:2px">Particles/atmosphere behind the app, if the theme has any.</div>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="particles-toggle" /> On
+      </label>
+    </div>
+  </div>
+
+  <div id="locked-note" class="settings-section" style="display:none">
+    <p class="locked-note"><a href="/">Log in</a> to see categories, security, and data settings.</p>
+  </div>
+
+  <div id="gated-sections" style="display:none">
+
+    <div class="settings-section">
+      <div class="settings-section-title">Categories &amp; Fields</div>
+      <div id="category-list"></div>
+      <button class="btn btn-ghost btn-block btn-sm" id="add-category-btn" style="margin-top:10px">+ New category</button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Security</div>
+      <form id="password-form">
+        <div class="field">
+          <label class="field-label">Current password</label>
+          <input class="input" type="password" id="old-password" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label class="field-label">New password</label>
+          <input class="input" type="password" id="new-password" autocomplete="new-password" />
+        </div>
+        <p class="hint" style="margin-bottom:14px">Changing this re-encrypts every item in your vault. It can take a moment if you have a lot of items.</p>
+        <div id="password-error" class="error-text" style="display:none"></div>
+        <div id="password-success" style="display:none;color:var(--success);font-size:13px;margin-top:10px">Password changed and vault re-encrypted.</div>
+        <button class="btn btn-primary" type="submit" id="password-submit">Change password</button>
+      </form>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Data</div>
+      <div class="row-demo">
+        <button class="btn btn-ghost" id="export-btn">Export vault (decrypted JSON)</button>
+        <label class="btn btn-ghost" style="cursor:pointer">
+          Import
+          <input type="file" id="import-file" accept="application/json" style="display:none" />
+        </label>
+      </div>
+      <div class="danger-zone" style="margin-top:20px">
+        <h3 style="margin-bottom:8px">Danger zone</h3>
+        <p class="hint" style="margin-bottom:12px">Deletes every category and every item. Cannot be undone.</p>
+        <button class="btn btn-danger" id="wipe-btn">Delete all data</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="admin-section" class="settings-section" style="display:none">
+    <div class="settings-section-title">Users</div>
+    <div class="field">
+      <label class="checkbox-row" style="margin-bottom:10px">
+        <input type="checkbox" id="custom-code-toggle" /> Have a custom code?
+      </label>
+      <div id="custom-code-field" style="display:none;margin-bottom:10px">
+        <input class="input mono" id="custom-code-input" placeholder="e.g. GAMER1" style="text-transform:uppercase" />
+      </div>
+      <button class="btn btn-primary btn-sm" id="create-invite-btn">Generate invite</button>
+      <div class="invite-result" id="invite-result" style="display:none"></div>
+    </div>
+    <table class="users-table" id="users-table" style="margin-top:20px">
+      <thead>
+        <tr><th>Username</th><th>Role</th><th>Status</th><th>Invite code</th><th>Last login</th></tr>
+      </thead>
+      <tbody id="users-tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="modal-backdrop" id="field-modal-backdrop" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Field</h2>
+      <button class="btn btn-icon btn-ghost" onclick="document.getElementById('field-modal-backdrop').style.display='none'">✕</button>
+    </div>
+    <div id="field-modal-body"></div>
+  </div>
+</div>
+
+<script type="module">
+import { checkSession, fetchCategories, createCategory, saveCategory, deleteCategory, createInvite, listUsers, changePassword, fetchItems, saveItem } from '/core/client/api.js';
+import { unlockVault, encryptItemData, decryptItemData } from '/core/client/crypto.js';
+import { buildIsel } from '/core/client/isel.js';
+import { newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES } from '/core/client/categories.js';
+import { initParticles, setParticlesEnabled } from '/core/client/particles.js';
+
+let themes = [];
+let session = { authenticated: false };
+let categories = [];
+
+async function loadThemeCards() {
+  themes = await fetch('/style/style.json').then(r => r.json());
+  const wrap = document.getElementById('theme-cards');
+  const current = (() => { try { return localStorage.getItem('waystone-preview-theme') || 'default'; } catch (e) { return 'default'; } })();
+
+  wrap.innerHTML = themes.map(t => `
+    <div class="theme-card ${t.id === current ? 'active' : ''}" data-id="${t.id}">
+      <div class="theme-swatches">${t.swatches.map(c => `<div class="theme-swatch" style="background:${c}"></div>`).join('')}</div>
+      <div class="theme-card-name">${t.name}</div>
+    </div>
+  `).join('');
+
+  wrap.querySelectorAll('.theme-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.id;
+      try { localStorage.setItem('waystone-preview-theme', id); } catch (e) {}
+      document.getElementById('theme-css').setAttribute('href', `/style/${id}.css`);
+      wrap.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', c === card));
+    });
+  });
+}
+
+function setupParticlesToggle() {
+  const toggle = document.getElementById('particles-toggle');
+  let stored = true;
+  try { stored = localStorage.getItem('waystone-particles-enabled') !== '0'; } catch (e) {}
+  toggle.checked = stored;
+  toggle.addEventListener('change', () => setParticlesEnabled(toggle.checked));
+}
+
+function fieldTypeLabel(field) {
+  if (field.type === 'secret') return `Secret · ${field.subtype || 'password'}`;
+  return field.type;
+}
+
+function renderCategoryList() {
+  const wrap = document.getElementById('category-list');
+  wrap.innerHTML = '';
+  for (const category of categories) {
+    const block = document.createElement('div');
+    block.className = 'category-block';
+
+    const head = document.createElement('div');
+    head.className = 'category-block-head';
+    const nameInput = document.createElement('input');
+    nameInput.className = 'input';
+    nameInput.value = category.name;
+    nameInput.style.flex = '1';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-danger btn-sm';
+    deleteBtn.textContent = 'Delete category';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Delete "${category.name}" and everything in it? This cannot be undone.`)) return;
+      await deleteCategory(category.id);
+      categories = categories.filter(c => c.id !== category.id);
+      renderCategoryList();
+    });
+    head.appendChild(nameInput);
+    head.appendChild(deleteBtn);
+    block.appendChild(head);
+
+    const fieldRows = document.createElement('div');
+    fieldRows.className = 'schema-fields';
+
+    function renderFields() {
+      fieldRows.innerHTML = '';
+      for (const field of category.fields) {
+        const row = document.createElement('div');
+        row.className = 'schema-field-row';
+
+        const fieldNameInput = document.createElement('input');
+        fieldNameInput.className = 'input';
+        fieldNameInput.value = field.name;
+        fieldNameInput.addEventListener('input', () => { field.name = fieldNameInput.value; });
+        row.appendChild(fieldNameInput);
+
+        const typeWrap = document.createElement('div');
+        typeWrap.className = 'isel';
+        typeWrap.style.minWidth = '120px';
+        buildIsel(typeWrap, FIELD_TYPES, field.type, (v) => {
+          field.type = v;
+          if (v === 'secret' && !field.subtype) field.subtype = 'password';
+          renderFields();
+        });
+        row.appendChild(typeWrap);
+
+        if (field.type === 'secret') {
+          const subtypeWrap = document.createElement('div');
+          subtypeWrap.className = 'isel';
+          subtypeWrap.style.minWidth = '140px';
+          buildIsel(subtypeWrap, SECRET_SUBTYPES, field.subtype || 'password', (v) => { field.subtype = v; });
+          row.appendChild(subtypeWrap);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn-remove-field';
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', () => {
+          category.fields = category.fields.filter(f => f.id !== field.id);
+          renderFields();
+        });
+        row.appendChild(removeBtn);
+
+        fieldRows.appendChild(row);
+      }
+    }
+    renderFields();
+    block.appendChild(fieldRows);
+
+    const addFieldBtn = document.createElement('button');
+    addFieldBtn.className = 'btn-add-field';
+    addFieldBtn.style.marginTop = '10px';
+    addFieldBtn.textContent = '+ Add Field';
+    addFieldBtn.addEventListener('click', () => {
+      category.fields.push({ id: newFieldId(), name: 'New field', type: 'text' });
+      renderFields();
+    });
+    block.appendChild(addFieldBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-primary btn-sm';
+    saveBtn.textContent = 'Save';
+    saveBtn.style.marginTop = '12px';
+    saveBtn.addEventListener('click', async () => {
+      category.name = nameInput.value;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try {
+        await saveCategory(category);
+        saveBtn.textContent = 'Saved ✓';
+        setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1200);
+      } catch (e) {
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
+        alert('Could not save: ' + e.message);
+      }
+    });
+    block.appendChild(saveBtn);
+
+    wrap.appendChild(block);
+  }
+}
+
+document.getElementById('add-category-btn').addEventListener('click', async () => {
+  const name = prompt('Category name');
+  if (!name) return;
+  const category = await createCategory({ id: newCategoryId(), name, icon: '📁', sortOrder: categories.length, fields: [] });
+  categories.push(category);
+  renderCategoryList();
+});
+
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const oldPassword = document.getElementById('old-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const errorEl = document.getElementById('password-error');
+  const successEl = document.getElementById('password-success');
+  const submitBtn = document.getElementById('password-submit');
+  errorEl.style.display = 'none';
+  successEl.style.display = 'none';
+  if (!oldPassword || !newPassword) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Re-encrypting…';
+  try {
+    const result = await changePassword(oldPassword, newPassword);
+    await unlockVault(oldPassword, result.salt);
+
+    const allItems = await fetchItems();
+    const decrypted = [];
+    for (const item of allItems) {
+      decrypted.push({ item, data: await decryptItemData(item) });
+    }
+
+    await unlockVault(newPassword, result.salt);
+    for (const { item, data } of decrypted) {
+      const enc = await encryptItemData(data);
+      await saveItem({ id: item.id, categoryId: item.categoryId, ...enc });
+    }
+
+    successEl.style.display = 'block';
+    document.getElementById('old-password').value = '';
+    document.getElementById('new-password').value = '';
+  } catch (err) {
+    errorEl.textContent = err.message || 'Could not change password — check your current password.';
+    errorEl.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Change password';
+  }
+});
+
+document.getElementById('export-btn').addEventListener('click', async () => {
+  const password = prompt('Enter your master password to export a decrypted copy:');
+  if (!password) return;
+  try {
+    const result = await checkSession();
+    await unlockVault(password, result.salt);
+
+    const allItems = await fetchItems();
+    const bundle = { exportedAt: new Date().toISOString(), categories, items: [] };
+    for (const item of allItems) {
+      const data = await decryptItemData(item);
+      bundle.items.push({ id: item.id, categoryId: item.categoryId, data });
+    }
+
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `waystone-export-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Export failed — check your password. ' + (e.message || ''));
+  }
+});
+
+document.getElementById('import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const password = prompt('Enter your master password to import (items will be encrypted with it):');
+  if (!password) { e.target.value = ''; return; }
+
+  try {
+    const text = await file.text();
+    const bundle = JSON.parse(text);
+    if (!Array.isArray(bundle.items)) throw new Error('File does not look like a WayStone export');
+
+    const result = await checkSession();
+    await unlockVault(password, result.salt);
+
+    let imported = 0;
+    for (const entry of bundle.items) {
+      if (!entry.categoryId || !categories.find(c => c.id === entry.categoryId)) continue;
+      const enc = await encryptItemData(entry.data);
+      await saveItemAsNew(entry.categoryId, enc);
+      imported++;
+    }
+    alert(`Imported ${imported} item(s). Categories referenced by the file that no longer exist were skipped.`);
+  } catch (err) {
+    alert('Import failed: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+});
+
+async function saveItemAsNew(categoryId, enc) {
+  const { createItem } = await import('/core/client/api.js');
+  return createItem({ id: crypto.randomUUID(), categoryId, ...enc });
+}
+
+document.getElementById('wipe-btn').addEventListener('click', async () => {
+  if (!confirm('This deletes every category and item permanently. Type-to-confirm not required, but there is no undo. Continue?')) return;
+  for (const category of categories) {
+    await deleteCategory(category.id);
+  }
+  categories = [];
+  renderCategoryList();
+  alert('All data deleted.');
+});
+
+document.getElementById('custom-code-toggle').addEventListener('change', (e) => {
+  document.getElementById('custom-code-field').style.display = e.target.checked ? 'block' : 'none';
+});
+
+document.getElementById('create-invite-btn').addEventListener('click', async () => {
+  const useCustom = document.getElementById('custom-code-toggle').checked;
+  const customCode = useCustom ? document.getElementById('custom-code-input').value.trim().toUpperCase() : null;
+  try {
+    const result = await createInvite(customCode || null);
+    const resultEl = document.getElementById('invite-result');
+    resultEl.style.display = 'flex';
+    resultEl.innerHTML = `<span>Code: <strong>${result.code}</strong></span>`;
+    await refreshUsers();
+  } catch (e) {
+    alert('Could not create invite: ' + e.message);
+  }
+});
+
+async function refreshUsers() {
+  const users = await listUsers();
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.username || '(pending)'}</td>
+      <td>${u.role}</td>
+      <td>${u.status}</td>
+      <td class="mono">${u.invite_code}${Number(u.invite_used) ? ' (used)' : ''}</td>
+      <td>${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+async function boot() {
+  initParticles();
+  await loadThemeCards();
+  setupParticlesToggle();
+
+  session = await checkSession();
+
+  if (!session.authenticated) {
+    document.getElementById('locked-note').style.display = '';
+    return;
+  }
+
+  document.getElementById('gated-sections').style.display = '';
+  categories = await fetchCategories();
+  renderCategoryList();
+
+  if (session.role === 'admin') {
+    document.getElementById('admin-section').style.display = '';
+    await refreshUsers();
+  }
+}
+
+boot();
+</script>
+
+</body>
+</html>
