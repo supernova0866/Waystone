@@ -1,0 +1,58 @@
+/* WayStone theme: Cosmic — deep space bg, slow-cycling nebula accent, glass cards.
+   Starfield + shooting-star particles are driven by core/client/particles.js
+   using the "particles" config for this theme in style.json — nothing here
+   draws stars, this file only owns flat/animated color. */
+
+@property --accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #7c6cff;
+}
+
+/* Kept inside a fixed mid-lightness/mid-saturation band on purpose: --accent-contrast
+   below is a single static color, so every stop in this loop must stay legible
+   against it as the hue drifts — no stop is allowed to swing much brighter or
+   darker than its neighbors. */
+@keyframes cosmic-drift {
+  0%   { --accent: #7c6cff; }
+  25%  { --accent: #6c9dff; }
+  50%  { --accent: #b06cff; }
+  75%  { --accent: #6cd7ff; }
+  100% { --accent: #7c6cff; }
+}
+
+:root {
+  --bg: #05040d;
+  --surface: #0b0a1a;
+  --surface-2: #121026;
+  --border: #241f42;
+
+  --text: #d9d5f2;
+  --text-strong: #f4f2ff;
+  --text-muted: #746f9c;
+
+  --accent: #7c6cff;
+  --accent-strong: #9d8dff;
+  --accent-contrast: #05040d;
+
+  --danger: #ff6178;
+  --danger-strong: #e14a61;
+  --success: #5fe0c0;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 20px 70px rgba(20, 10, 60, 0.6);
+
+  /* glassmorphism: on — starfield/streaks show through translucent cards */
+  --glass-blur: 14px;
+  --glass-opacity: 0.55;
+
+  animation: cosmic-drift 14s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { animation: none; --accent: #7c6cff; }
+}

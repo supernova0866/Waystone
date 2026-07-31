@@ -1,0 +1,57 @@
+/* WayStone theme: RGB Light — light bg counterpart to RGB Dark. Same mechanism:
+   --accent-cycle only drives borders/outlines via base.css's fallback pattern,
+   fills/text stay static and legible. Cycle colors are pulled slightly deeper/
+   more saturated than RGB Dark's so they stay visible against a white surface. */
+
+@property --accent-cycle {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #e0304f;
+}
+
+@keyframes rgb-cycle-light {
+  0%   { --accent-cycle: #e0304f; }
+  17%  { --accent-cycle: #e07a1f; }
+  33%  { --accent-cycle: #c9c400; }
+  50%  { --accent-cycle: #1fae5a; }
+  67%  { --accent-cycle: #1f8fc9; }
+  83%  { --accent-cycle: #7a1fc9; }
+  100% { --accent-cycle: #e0304f; }
+}
+
+:root {
+  --bg: #f7f7fa;
+  --surface: #ffffff;
+  --surface-2: #eeeef3;
+  --border: #d8d8e2;
+
+  --text: #35354a;
+  --text-strong: #17172a;
+  --text-muted: #7c7c92;
+
+  --accent: #5751d9;
+  --accent-strong: #423ec2;
+  --accent-contrast: #ffffff;
+
+  --danger: #d9403f;
+  --danger-strong: #c22e2d;
+  --success: #1f9e5c;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 16px 40px rgba(30, 30, 60, 0.12);
+
+  /* glassmorphism: off */
+  --glass-blur: 0px;
+  --glass-opacity: 1;
+
+  --accent-cycle: #e0304f;
+  animation: rgb-cycle-light 8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { animation: none; --accent-cycle: #5751d9; }
+}

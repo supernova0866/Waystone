@@ -1,0 +1,30 @@
+/* WayStone theme: Vantablack — OLED-style true black, glass cards, punchy accent */
+:root {
+  --bg: #000000;
+  --surface: #030303;
+  --surface-2: #0a0a0a;
+  --border: #1c1c1c;
+
+  --text: #e4e4e4;
+  --text-strong: #ffffff;
+  --text-muted: #6e6e6e;
+
+  --accent: #d6ff3f;
+  --accent-strong: #e6ff70;
+  --accent-contrast: #0a0a00;
+
+  --danger: #ff4d5e;
+  --danger-strong: #e13648;
+  --success: #33e29b;
+
+  --radius: 5px;
+  --radius-lg: 9px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 20px 70px rgba(0, 0, 0, 0.9);
+
+  /* glassmorphism: on — true black showing through translucent, blurred cards */
+  --glass-blur: 16px;
+  --glass-opacity: 0.5;
+}

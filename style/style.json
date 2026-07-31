@@ -1,0 +1,7 @@
+[
+  { "id": "default", "name": "Stone",   "file": "default.css", "swatches": ["#17161b", "#8a9a7c", "#a3b494"] },
+  { "id": "dusk",     "name": "Dusk",    "file": "dusk.css",    "swatches": ["#100f1a", "#8b7ff0", "#a599f7"] },
+  { "id": "verdant",  "name": "Verdant", "file": "verdant.css", "swatches": ["#0d1710", "#6fcf7a", "#8fe097"] },
+  { "id": "ember",    "name": "Ember",   "file": "ember.css",   "swatches": ["#150e09", "#e08a3c", "#f2a054"] },
+  { "id": "frost",    "name": "Frost",   "file": "frost.css",   "swatches": ["#f3f6f8", "#2f8fd1", "#1f77b8"] }
+]

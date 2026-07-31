@@ -1,0 +1,30 @@
+/* WayStone theme: Vivid Blue — dark bg, saturated electric-blue accent */
+:root {
+  --bg: #0a1120;
+  --surface: #10192e;
+  --surface-2: #16223c;
+  --border: #22345a;
+
+  --text: #dbe6fb;
+  --text-strong: #f2f6ff;
+  --text-muted: #7791c2;
+
+  --accent: #2f6bff;
+  --accent-strong: #5c8bff;
+  --accent-contrast: #04060f;
+
+  --danger: #ff5c72;
+  --danger-strong: #e0455b;
+  --success: #38d9a9;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 20px 60px rgba(10, 30, 90, 0.5);
+
+  /* glassmorphism: off */
+  --glass-blur: 0px;
+  --glass-opacity: 1;
+}

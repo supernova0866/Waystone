@@ -1,0 +1,26 @@
+/* WayStone theme: Stone (default) — warm dark charcoal with a mossy accent */
+:root {
+  --bg: #17161b;
+  --surface: #201f26;
+  --surface-2: #262530;
+  --border: #34323d;
+
+  --text: #e9e6df;
+  --text-strong: #f5f2ea;
+  --text-muted: #948e82;
+
+  --accent: #8a9a7c;
+  --accent-strong: #a3b494;
+  --accent-contrast: #12130e;
+
+  --danger: #d97757;
+  --danger-strong: #c2603f;
+  --success: #7fb787;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
