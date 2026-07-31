@@ -1,0 +1,47 @@
+/*
+  base.stub.css — THE VARIABLE CONTRACT
+  ---------------------------------------
+  This file is never linked from any HTML page and is not listed in
+  style.json. It exists only as a reference for scripts/validate-themes.js,
+  which diffs every real theme file's declared custom properties against
+  this list. If a theme is missing one of these, the validator will flag it
+  before it ships — base.css relies on every one of these being defined by
+  whichever theme file loads alongside it.
+
+  Placeholder values are deliberately loud/unusable (magenta, etc.) so that
+  if this file were ever accidentally linked, it would be obvious.
+*/
+
+:root {
+  /* surfaces */
+  --bg: #ff00ff;
+  --surface: #ff00ff;
+  --surface-2: #ff00ff;
+  --border: #ff00ff;
+
+  /* text */
+  --text: #ff00ff;
+  --text-strong: #ff00ff;
+  --text-muted: #ff00ff;
+
+  /* accent (brand / primary actions) */
+  --accent: #ff00ff;
+  --accent-strong: #ff00ff;
+  --accent-contrast: #ff00ff;
+
+  /* semantic */
+  --danger: #ff00ff;
+  --danger-strong: #ff00ff;
+  --success: #ff00ff;
+
+  /* shape */
+  --radius: 1px;
+  --radius-lg: 1px;
+
+  /* type */
+  --font-sans: initial;
+  --font-mono: initial;
+
+  /* elevation */
+  --shadow-modal: none;
+}
