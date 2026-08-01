@@ -1,4 +1,4 @@
-/* WayStone theme: Vantablack — OLED-style true black, glass cards, punchy accent */
+/* WayStone theme: Vantablack — OLED-style true black, glass cards, punchy green accent */
 :root {
   --bg: #000000;
   --surface: #030303;
@@ -9,13 +9,13 @@
   --text-strong: #ffffff;
   --text-muted: #6e6e6e;
 
-  --accent: #d6ff3f;
-  --accent-strong: #e6ff70;
-  --accent-contrast: #0a0a00;
+  --accent: #39ff8a;
+  --accent-strong: #6dffaa;
+  --accent-contrast: #001a0a;
 
   --danger: #ff4d5e;
   --danger-strong: #e13648;
-  --success: #33e29b;
+  --success: #2dd4bf;
 
   --radius: 5px;
   --radius-lg: 9px;
