@@ -1,7 +1,7 @@
 /* WayStone theme: RGB Light — light bg counterpart to RGB Dark. Same mechanism:
    --accent-cycle only drives borders/outlines via base.css's fallback pattern,
-   fills/text stay static and legible. Cycle colors are pulled slightly deeper/
-   more saturated than RGB Dark's so they stay visible against a white surface. */
+   fills/text stay static and legible. Same full-spectrum sweep as RGB Dark,
+   just pulled deeper/more saturated so it stays visible on white. */
 
 @property --accent-cycle {
   syntax: '<color>';
@@ -10,13 +10,14 @@
 }
 
 @keyframes rgb-cycle-light {
-  0%   { --accent-cycle: #e0304f; }
-  17%  { --accent-cycle: #e07a1f; }
-  33%  { --accent-cycle: #c9c400; }
-  50%  { --accent-cycle: #1fae5a; }
-  67%  { --accent-cycle: #1f8fc9; }
-  83%  { --accent-cycle: #7a1fc9; }
-  100% { --accent-cycle: #e0304f; }
+  0%   { --accent-cycle: #e03030; }
+  14%  { --accent-cycle: #e07a1f; }
+  28%  { --accent-cycle: #c9c400; }
+  42%  { --accent-cycle: #1fae4a; }
+  57%  { --accent-cycle: #1fae9f; }
+  71%  { --accent-cycle: #1f6fc9; }
+  85%  { --accent-cycle: #9c1fc9; }
+  100% { --accent-cycle: #e03030; }
 }
 
 :root {
@@ -48,7 +49,7 @@
   --glass-blur: 0px;
   --glass-opacity: 1;
 
-  --accent-cycle: #e0304f;
+  --accent-cycle: #e03030;
   animation: rgb-cycle-light 8s linear infinite;
 }
 
