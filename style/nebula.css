@@ -1,0 +1,55 @@
+/* WayStone theme: Nebula — deep violet space tones, static violet accent for
+   fills/text/badges. --accent-cycle drives a SEPARATE, narrower violet → blue →
+   magenta sweep that only touches borders/focus rings/other outline-only spots
+   in base.css (see var(--accent-cycle, var(--accent)) fallback pattern) — this
+   is the "curated ambient glow" counterpart to RGB Dark/Light's full rainbow. */
+
+@property --accent-cycle {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8a5fff;
+}
+
+@keyframes nebula-cycle {
+  0%   { --accent-cycle: #8a5fff; }
+  33%  { --accent-cycle: #5f8aff; }
+  66%  { --accent-cycle: #c15fff; }
+  100% { --accent-cycle: #8a5fff; }
+}
+
+:root {
+  --bg: #0d0a17;
+  --surface: #140f24;
+  --surface-2: #1c1630;
+  --border: #32284f;
+
+  --text: #d9d3f0;
+  --text-strong: #f3f0fc;
+  --text-muted: #8a83ab;
+
+  --accent: #9d6eff;
+  --accent-strong: #b78dff;
+  --accent-contrast: #0c0716;
+
+  --danger: #ff6178;
+  --danger-strong: #e14a61;
+  --success: #5fe0c0;
+
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --shadow-modal: 0 20px 70px rgba(20, 10, 60, 0.6);
+
+  /* glassmorphism: on — starfield shows through translucent cards */
+  --glass-blur: 14px;
+  --glass-opacity: 0.55;
+
+  --accent-cycle: #8a5fff;
+  animation: nebula-cycle 12s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { animation: none; --accent-cycle: #9d6eff; }
+}
