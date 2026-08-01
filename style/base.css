@@ -132,7 +132,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 }
 .input:focus, .textarea:focus {
   border-color: var(--accent-cycle, var(--accent));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-cycle, var(--accent)) 20%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent-cycle, var(--accent)) 20%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent-cycle, var(--accent)) 30%, transparent);
 }
 .textarea { font-family: var(--font-sans); resize: vertical; min-height: 84px; line-height: 1.6; }
 
@@ -162,7 +164,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   transition: border-color 0.15s;
 }
 .isel-trigger:hover { border-color: var(--accent-strong); }
-.isel-trigger.open { border-color: var(--accent-cycle, var(--accent)); border-radius: var(--radius) var(--radius) 0 0; }
+.isel-trigger.open { border-color: var(--accent-cycle, var(--accent)); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 0 14px color-mix(in srgb, var(--accent-cycle, var(--accent)) 30%, transparent); }
 .isel-arrow { font-size: 8px; color: var(--text-muted); transition: transform 0.15s; }
 .isel-trigger.open .isel-arrow { transform: rotate(180deg); color: var(--accent); }
 .isel-menu {
@@ -479,7 +481,12 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   transition: border-color 0.15s;
 }
 .theme-card:hover { border-color: var(--accent-strong); }
-.theme-card.active { border-color: var(--accent-cycle, var(--accent)); box-shadow: 0 0 0 1px var(--accent-cycle, var(--accent)); }
+.theme-card.active {
+  border-color: var(--accent-cycle, var(--accent));
+  box-shadow:
+    0 0 0 1px var(--accent-cycle, var(--accent)),
+    0 0 16px color-mix(in srgb, var(--accent-cycle, var(--accent)) 35%, transparent);
+}
 .theme-swatches { display: flex; gap: 5px; margin-bottom: 8px; }
 .theme-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); }
 .theme-card-name { font-size: 12.5px; color: var(--text); }
@@ -489,3 +496,29 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .centered { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; }
 .panel-narrow { width: 100%; max-width: 360px; }
+
+/* ── Settings panel — shared by pages/settings.html and the in-app settings
+   modal (app.js), so the layout only lives in one place. The modal variant
+   just wraps the same markup in a wider, scrollable modal shell instead of
+   a full page, so opening it doesn't cost a page reload / re-locked vault. */
+
+.settings-shell { max-width: 720px; margin: 0 auto; padding: 32px 24px 80px; }
+.settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+.settings-section { margin-bottom: 48px; }
+.settings-section:last-child { margin-bottom: 0; }
+.settings-section-title {
+  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.locked-note { font-size: 13px; color: var(--text-muted); }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.category-block { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; }
+.category-block-head { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.invite-result { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); font-family: var(--font-mono); margin-top: 10px; }
+.users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.users-table th, .users-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.users-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.danger-zone { border: 1px solid var(--danger); border-radius: var(--radius-lg); padding: 16px; }
+
+.modal-settings { max-width: 720px; }
+.modal-settings .settings-shell { padding: 0; max-width: none; }
