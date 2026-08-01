@@ -1,7 +1,8 @@
-import { checkSession, login, logout, fetchCategories, createCategory, fetchItems, createItem, saveItem, deleteItem } from '/core/client/api.js';
+import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, deleteCategory, fetchItems, createItem, saveItem, deleteItem } from '/core/client/api.js';
 import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData } from '/core/client/crypto.js';
 import { createItemCard } from '/core/client/items.js';
-import { renderSidebarList, newCategoryId } from '/core/client/categories.js';
+import { renderSidebarList, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES } from '/core/client/categories.js';
+import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles } from '/core/client/particles.js';
 
@@ -31,11 +32,16 @@ const el = {
   topbarTitle: document.getElementById('topbar-title'),
   cardGrid: document.getElementById('card-grid'),
   addItemBtn: document.getElementById('add-item-btn'),
+  editSchemaBtn: document.getElementById('edit-schema-btn'),
   addCategoryBtn: document.getElementById('add-category-btn'),
   lockBtn: document.getElementById('lock-btn'),
   logoutBtn: document.getElementById('logout-btn'),
   modalBackdrop: document.getElementById('item-modal-backdrop'),
   modalBody: document.getElementById('item-modal-body'),
+  schemaModalBackdrop: document.getElementById('schema-modal-backdrop'),
+  schemaModalBody: document.getElementById('schema-modal-body'),
+  schemaModalTitle: document.getElementById('schema-modal-title'),
+  schemaModalClose: document.getElementById('schema-modal-close'),
 };
 
 function hideAllGates() {
@@ -127,6 +133,7 @@ function updateTopbar() {
 
 function updateAddItemAvailability() {
   el.addItemBtn.disabled = !state.activeCategoryId;
+  el.editSchemaBtn.disabled = !state.activeCategoryId;
 }
 
 async function selectCategory(id) {
@@ -234,8 +241,13 @@ function openEditor(item, data) {
   if (!category?.fields?.length) {
     const note = document.createElement('p');
     note.className = 'hint';
-    note.textContent = 'This category has no custom fields yet — add some in Settings.';
+    note.innerHTML = `This category has no custom fields yet — <a href="#" id="modal-edit-schema-link">edit its schema</a>.`;
     el.modalBody.appendChild(note);
+    note.querySelector('#modal-edit-schema-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      closeEditor();
+      openSchemaEditor(category);
+    });
   }
 
   const getters = {};
@@ -297,6 +309,140 @@ function openEditor(item, data) {
 function closeEditor() {
   el.modalBackdrop.style.display = 'none';
 }
+
+/* ── Schema editor — reachable directly from the topbar, one field-row-per-field,
+   mirrors the compact editor from Settings but scoped to a single category so
+   the flow is "click Edit Schema on the category you're looking at" rather than
+   "navigate to Settings, scroll to find the category, expand it." ────────── */
+
+function openSchemaEditor(category) {
+  const working = { ...category, fields: category.fields.map(f => ({ ...f })) };
+  el.schemaModalTitle.textContent = `Edit Schema — ${category.name}`;
+  el.schemaModalBody.innerHTML = '';
+
+  const nameField = document.createElement('div');
+  nameField.className = 'field';
+  nameField.innerHTML = `<label class="field-label">Tab name</label>`;
+  const nameInput = document.createElement('input');
+  nameInput.className = 'input';
+  nameInput.value = working.name;
+  nameField.appendChild(nameInput);
+  el.schemaModalBody.appendChild(nameField);
+
+  const fieldsLabel = document.createElement('label');
+  fieldsLabel.className = 'field-label';
+  fieldsLabel.textContent = 'Fields';
+  fieldsLabel.style.display = 'block';
+  fieldsLabel.style.marginBottom = '8px';
+  el.schemaModalBody.appendChild(fieldsLabel);
+
+  const fieldRows = document.createElement('div');
+  fieldRows.className = 'schema-fields';
+  el.schemaModalBody.appendChild(fieldRows);
+
+  function renderFields() {
+    fieldRows.innerHTML = '';
+    for (const field of working.fields) {
+      const row = document.createElement('div');
+      row.className = 'schema-field-row';
+
+      const fieldNameInput = document.createElement('input');
+      fieldNameInput.className = 'input';
+      fieldNameInput.value = field.name;
+      fieldNameInput.addEventListener('input', () => { field.name = fieldNameInput.value; });
+      row.appendChild(fieldNameInput);
+
+      const typeWrap = document.createElement('div');
+      typeWrap.className = 'isel';
+      typeWrap.style.minWidth = '120px';
+      buildIsel(typeWrap, FIELD_TYPES, field.type, (v) => {
+        field.type = v;
+        if (v === 'secret' && !field.subtype) field.subtype = 'password';
+        renderFields();
+      });
+      row.appendChild(typeWrap);
+
+      if (field.type === 'secret') {
+        const subtypeWrap = document.createElement('div');
+        subtypeWrap.className = 'isel';
+        subtypeWrap.style.minWidth = '140px';
+        buildIsel(subtypeWrap, SECRET_SUBTYPES, field.subtype || 'password', (v) => { field.subtype = v; });
+        row.appendChild(subtypeWrap);
+      }
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-remove-field';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', () => {
+        working.fields = working.fields.filter(f => f !== field);
+        renderFields();
+      });
+      row.appendChild(removeBtn);
+
+      fieldRows.appendChild(row);
+    }
+  }
+  renderFields();
+
+  const addFieldBtn = document.createElement('button');
+  addFieldBtn.className = 'btn-add-field';
+  addFieldBtn.style.marginTop = '10px';
+  addFieldBtn.textContent = '+ Add Field';
+  addFieldBtn.addEventListener('click', () => {
+    working.fields.push({ id: newFieldId(), name: 'New field', type: 'text' });
+    renderFields();
+  });
+  el.schemaModalBody.appendChild(addFieldBtn);
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  actions.innerHTML = `
+    <button class="btn btn-danger" id="schema-delete-tab">Delete Tab</button>
+    <div class="modal-spacer"></div>
+    <button class="btn btn-ghost" id="schema-cancel">Cancel</button>
+    <button class="btn btn-primary" id="schema-save">Save Changes</button>
+  `;
+  actions.style.marginTop = '20px';
+  actions.style.paddingTop = '16px';
+  actions.style.borderTop = '1px solid var(--border)';
+  el.schemaModalBody.appendChild(actions);
+
+  actions.querySelector('#schema-cancel').addEventListener('click', closeSchemaEditor);
+  actions.querySelector('#schema-delete-tab').addEventListener('click', async () => {
+    if (!confirm(`Delete "${working.name}" and everything in it? This cannot be undone.`)) return;
+    await withSessionGuard(() => deleteCategory(working.id));
+    closeSchemaEditor();
+    if (state.activeCategoryId === working.id) state.activeCategoryId = null;
+    await loadCategories();
+  });
+  actions.querySelector('#schema-save').addEventListener('click', async () => {
+    const saveBtn = actions.querySelector('#schema-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+      working.name = nameInput.value;
+      const saved = await withSessionGuard(() => saveCategory(working));
+      if (saved === null) return;
+      closeSchemaEditor();
+      await loadCategories();
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Changes';
+    }
+  });
+
+  el.schemaModalBackdrop.style.display = 'flex';
+}
+
+function closeSchemaEditor() {
+  el.schemaModalBackdrop.style.display = 'none';
+}
+
+el.schemaModalClose.addEventListener('click', closeSchemaEditor);
+el.editSchemaBtn?.addEventListener('click', () => {
+  const category = activeCategory();
+  if (category) openSchemaEditor(category);
+});
 
 el.addItemBtn?.addEventListener('click', () => {
   if (!state.activeCategoryId) return;
