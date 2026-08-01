@@ -285,16 +285,22 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
-  cursor: pointer;
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.15s, transform 0.1s;
 }
 .item-card:hover { border-color: var(--accent-strong); }
-.item-card:active { transform: translateY(1px); }
+
+/* Left-edge accent so the card's secret type reads at a glance, before you even look at the hero */
+.item-card--totp { border-left: 3px solid var(--success); }
+.item-card--backup-codes { border-left: 3px solid var(--accent-strong); }
+.item-card--password { border-left: 3px solid var(--accent); }
 
 .item-card-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
   margin-bottom: 10px;
 }
+.item-card-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .item-card-title { font-weight: 600; color: var(--text-strong); font-size: 15px; }
 .item-card-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
@@ -302,6 +308,18 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .item-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .item-card-row-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
 .item-card-row-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Bottom-right edit affordance, present on every card regardless of type/content length */
+.item-card-footer { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 12px; }
+.item-card-edit-btn {
+  width: 28px; height: 28px; padding: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.item-card:hover .item-card-edit-btn { opacity: 1; }
+.item-card-edit-btn:hover { color: var(--accent); border-color: var(--accent-strong); }
 
 /* Secret (password) value: masked dots + reveal/copy */
 .secret-value {
@@ -346,6 +364,42 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   transition: width 1s linear, background-color 0.3s;
 }
 .totp-bar-fill.low { background: var(--danger); }
+
+/* Backup-codes hero: remaining-count is the headline, copy is one tap away */
+.backup-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 2px 0 4px;
+}
+.backup-hero-count { display: flex; align-items: baseline; gap: 6px; }
+.backup-hero-num {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.backup-hero-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Password hero: the same reveal/copy affordances as a row, just sized as the card's lead element */
+.password-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 2px 0 4px;
+}
+.password-hero-dots {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  user-select: none;
+}
+.password-hero-actions { display: flex; gap: 4px; }
+
+/* Any hero block sits above the remaining fields with its own breathing room */
+.totp-block, .backup-hero, .password-hero { margin-bottom: 14px; }
 
 /* Copy feedback toast on a card */
 .copied-flash {
