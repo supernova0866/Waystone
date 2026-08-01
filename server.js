@@ -261,7 +261,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/settings') {
-      return serveFile(res, path.join(__dirname, 'pages', 'settings.html'));
+      // No separate settings page anymore — same app shell as '/'. app.js
+      // detects this path on boot and opens the settings modal itself,
+      // then cleans the URL back to '/' so it isn't a "page" you can get stuck on.
+      return serveFile(res, path.join(__dirname, 'index.html'));
     }
 
     if (pathname === '/handbook') {
