@@ -26,4 +26,11 @@ function newCategoryId() {
 const FIELD_TYPES = ['text', 'integer', 'rich-text', 'secret'];
 const SECRET_SUBTYPES = ['password', 'totp', 'backup-codes'];
 
-export { renderSidebarList, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES };
+function pickTitleFields(fields) {
+  const displayable = (fields || []).filter(f => f.type !== 'secret');
+  const titleField = displayable[0] || null;
+  const subtitleField = displayable.find(f => f !== titleField) || null;
+  return { titleField, subtitleField };
+}
+
+export { renderSidebarList, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
