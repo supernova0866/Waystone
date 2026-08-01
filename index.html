@@ -87,6 +87,7 @@
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">WayStone</div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" id="edit-schema-btn">⚙ Edit Schema</button>
         <button class="btn btn-primary btn-sm" id="add-item-btn">+ New item</button>
       </div>
     </div>
@@ -103,6 +104,16 @@
       <button class="btn btn-icon btn-ghost" onclick="document.getElementById('item-modal-backdrop').style.display='none'">✕</button>
     </div>
     <div id="item-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="schema-modal-backdrop" style="display:none">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 id="schema-modal-title">Edit Schema</h2>
+      <button class="btn btn-icon btn-ghost" id="schema-modal-close">✕</button>
+    </div>
+    <div id="schema-modal-body"></div>
   </div>
 </div>
 
