@@ -46,9 +46,17 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --shadow-modal: 0 20px 70px rgba(20, 10, 60, 0.6);
 
-  /* glassmorphism: on — starfield/streaks show through translucent cards */
+  /* glassmorphism: on — starfield shows through translucent cards */
   --glass-blur: 14px;
   --glass-opacity: 0.55;
+
+  /* Unlike RGB Dark/Light and Nebula, Cosmic's OWN --accent is what animates
+     (cosmic-drift, above) — fills/badges/text are meant to drift too, not stay
+     static. This alias just lets base.css's var(--accent-cycle, fallback)
+     pattern (used for border-only spots like the card left-edge, focus rings,
+     etc.) resolve to that same live, already-animated value, instead of only
+     whichever specific spots happen to fall back to var(--accent) directly. */
+  --accent-cycle: var(--accent);
 
   animation: cosmic-drift 14s ease-in-out infinite;
 }
