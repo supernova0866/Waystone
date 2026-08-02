@@ -1,35 +1,37 @@
-/* WayStone theme: Nebula — deep violet space tones, static violet accent for
-   fills/text/badges. --accent-cycle drives a SEPARATE, narrower violet → blue →
-   magenta sweep that only touches borders/focus rings/other outline-only spots
-   in base.css (see var(--accent-cycle, var(--accent)) fallback pattern) — this
-   is the "curated ambient glow" counterpart to RGB Dark/Light's full rainbow. */
+/* WayStone theme: Nebula — deep magenta/plum space tones, static violet-pink
+   accent for fills/text/badges. Deliberately shifted warmer than Cosmic
+   (which leans blue-violet-cyan) so the two don't read as the same theme
+   twice. --accent-cycle drives a SEPARATE, narrower magenta → violet → pink
+   sweep that only touches borders/focus rings/other outline-only spots in
+   base.css (see var(--accent-cycle, var(--accent)) fallback pattern) — the
+   "curated ambient glow" counterpart to RGB Dark/Light's full rainbow. */
 
 @property --accent-cycle {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8a5fff;
+  initial-value: #c964f0;
 }
 
 @keyframes nebula-cycle {
-  0%   { --accent-cycle: #8a5fff; }
-  33%  { --accent-cycle: #5f8aff; }
-  66%  { --accent-cycle: #c15fff; }
-  100% { --accent-cycle: #8a5fff; }
+  0%   { --accent-cycle: #c964f0; }
+  33%  { --accent-cycle: #8a5fff; }
+  66%  { --accent-cycle: #ff6ec7; }
+  100% { --accent-cycle: #c964f0; }
 }
 
 :root {
-  --bg: #0d0a17;
-  --surface: #140f24;
-  --surface-2: #1c1630;
-  --border: #32284f;
+  --bg: #170a1f;
+  --surface: #20102b;
+  --surface-2: #2a1638;
+  --border: #452a56;
 
-  --text: #d9d3f0;
-  --text-strong: #f3f0fc;
-  --text-muted: #8a83ab;
+  --text: #e8d6f0;
+  --text-strong: #f9effc;
+  --text-muted: #a389b0;
 
-  --accent: #9d6eff;
-  --accent-strong: #b78dff;
-  --accent-contrast: #0c0716;
+  --accent: #c964f0;
+  --accent-strong: #dd8dff;
+  --accent-contrast: #15071c;
 
   --danger: #ff6178;
   --danger-strong: #e14a61;
@@ -40,16 +42,16 @@
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --shadow-modal: 0 20px 70px rgba(20, 10, 60, 0.6);
+  --shadow-modal: 0 20px 70px rgba(60, 10, 60, 0.55);
 
   /* glassmorphism: on — starfield shows through translucent cards */
   --glass-blur: 14px;
   --glass-opacity: 0.55;
 
-  --accent-cycle: #8a5fff;
+  --accent-cycle: #c964f0;
   animation: nebula-cycle 12s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { animation: none; --accent-cycle: #9d6eff; }
+  :root { animation: none; --accent-cycle: #c964f0; }
 }
