@@ -14,11 +14,12 @@
     "id": "nebula",
     "name": "Nebula",
     "file": "nebula.css",
-    "swatches": ["#0d0a17", "#9d6eff", "#b78dff"],
+    "swatches": ["#170a1f", "#c964f0", "#dd8dff"],
     "particles": {
       "layers": [
-        { "type": "twinkle", "color": "text-strong", "count": 90, "opacity": [0.15, 0.6], "twinkleSpeed": 0.016 },
-        { "type": "streak", "color": "accent", "frequency": [8000, 19000], "speed": 8, "length": 80, "opacity": 0.75 }
+        { "type": "twinkle", "color": "accent", "count": 55, "opacity": [0.12, 0.45], "twinkleSpeed": 0.01 },
+        { "type": "twinkle", "color": "text-strong", "count": 25, "opacity": [0.1, 0.35], "twinkleSpeed": 0.014 },
+        { "type": "streak", "color": "accent", "frequency": [10000, 22000], "speed": 6, "length": 60, "opacity": 0.6 }
       ]
     }
   },
