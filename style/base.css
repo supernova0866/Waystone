@@ -308,7 +308,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 }
 
 .item-card {
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) calc(var(--glass-opacity, 1) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -319,9 +321,9 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .item-card:hover { border-color: var(--accent-strong); }
 
 /* Left-edge accent so the card's secret type reads at a glance, before you even look at the hero */
-.item-card--totp { border-left: 3px solid var(--success); }
-.item-card--backup-codes { border-left: 3px solid var(--accent-strong); }
-.item-card--password { border-left: 3px solid var(--accent); }
+.item-card--totp { border-left: 3px solid var(--accent-cycle, var(--success)); }
+.item-card--backup-codes { border-left: 3px solid var(--accent-cycle, var(--accent-strong)); }
+.item-card--password { border-left: 3px solid var(--accent-cycle, var(--accent)); }
 
 .item-card-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
@@ -493,6 +495,30 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 
 .empty-state { text-align: center; color: var(--text-muted); padding: 60px 20px; }
 .empty-state .es-icon { font-size: 30px; margin-bottom: 10px; opacity: 0.6; }
+
+/* ── Loading skeletons — shown immediately on tab switch, one per known/
+   expected item, then swapped for real cards as each one finishes
+   decrypting (see loadItems() in app.js). Shimmer already respects
+   prefers-reduced-motion via the global `* { animation: none }` rule
+   near the top of this file, so no extra media query needed here. */
+
+.item-card-skeleton { gap: 10px; cursor: default; }
+.skeleton-line, .skeleton-block {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-line { height: 12px; width: 70%; }
+.skeleton-title { width: 55%; height: 16px; }
+.skeleton-sub { width: 35%; }
+.skeleton-block { height: 40px; margin: 2px 0; }
+.skeleton-line.short { width: 30%; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* ── Theme picker (settings) ─────────────────────────────────────────── */
 
