@@ -338,8 +338,15 @@ function openSchemaEditor(category) {
   fieldsLabel.className = 'field-label';
   fieldsLabel.textContent = 'Fields';
   fieldsLabel.style.display = 'block';
-  fieldsLabel.style.marginBottom = '8px';
+  fieldsLabel.style.marginBottom = '2px';
   el.schemaModalBody.appendChild(fieldsLabel);
+
+  const fieldsHint = document.createElement('p');
+  fieldsHint.className = 'hint';
+  fieldsHint.style.marginTop = '0';
+  fieldsHint.style.marginBottom = '10px';
+  fieldsHint.textContent = 'Right-click a field to reorder it.';
+  el.schemaModalBody.appendChild(fieldsHint);
 
   const fieldRows = document.createElement('div');
   fieldRows.className = 'schema-fields';
@@ -383,6 +390,18 @@ function openSchemaEditor(category) {
         renderFields();
       });
       row.appendChild(removeBtn);
+
+      row.addEventListener('contextmenu', (e) => {
+        const idx = working.fields.indexOf(field);
+        showFieldContextMenu(e, {
+          atTop: idx === 0,
+          atBottom: idx === working.fields.length - 1,
+          onMoveTop: () => moveField(working.fields, idx, 0, renderFields),
+          onMoveUp: () => moveField(working.fields, idx, idx - 1, renderFields),
+          onMoveDown: () => moveField(working.fields, idx, idx + 1, renderFields),
+          onMoveBottom: () => moveField(working.fields, idx, working.fields.length - 1, renderFields),
+        });
+      });
 
       fieldRows.appendChild(row);
     }
@@ -443,6 +462,74 @@ function closeSchemaEditor() {
   el.schemaModalBackdrop.style.display = 'none';
 }
 
+/* ── Field reorder context menu — right-click a field row in the schema
+   editor for Move to Top / Move Up / Move Down / Move to Bottom. ───────── */
+
+function moveField(fields, fromIdx, toIdx, rerender) {
+  const clamped = Math.max(0, Math.min(toIdx, fields.length - 1));
+  if (clamped === fromIdx) return;
+  const [field] = fields.splice(fromIdx, 1);
+  fields.splice(clamped, 0, field);
+  rerender();
+}
+
+let activeFieldContextMenu = null;
+
+function closeFieldContextMenu() {
+  if (activeFieldContextMenu) {
+    activeFieldContextMenu.remove();
+    activeFieldContextMenu = null;
+  }
+}
+
+document.addEventListener('click', closeFieldContextMenu);
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('.schema-field-row')) closeFieldContextMenu();
+});
+document.addEventListener('scroll', closeFieldContextMenu, true);
+window.addEventListener('resize', closeFieldContextMenu);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFieldContextMenu(); });
+
+function showFieldContextMenu(e, { atTop, atBottom, onMoveTop, onMoveUp, onMoveDown, onMoveBottom }) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeFieldContextMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'field-context-menu';
+
+  const options = [
+    { label: 'Move to Top', action: onMoveTop, disabled: atTop },
+    { label: 'Move Up', action: onMoveUp, disabled: atTop },
+    { label: 'Move Down', action: onMoveDown, disabled: atBottom },
+    { label: 'Move to Bottom', action: onMoveBottom, disabled: atBottom },
+  ];
+
+  for (const opt of options) {
+    const item = document.createElement('div');
+    item.className = 'field-context-menu-opt' + (opt.disabled ? ' disabled' : '');
+    item.textContent = opt.label;
+    if (!opt.disabled) {
+      item.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        opt.action();
+        closeFieldContextMenu();
+      });
+    }
+    menu.appendChild(item);
+  }
+
+  document.body.appendChild(menu);
+  activeFieldContextMenu = menu;
+
+  const rect = menu.getBoundingClientRect();
+  let x = e.clientX, y = e.clientY;
+  if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+  if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
 /* ── Settings — now a modal instead of a page navigation. Settings used to
    live at /settings, a full page load; that reset the JS module state,
    which meant the in-memory unlocked vault key (crypto.js's module-level
@@ -469,15 +556,6 @@ async function openSettingsModal() {
     </div>
   `;
   el.settingsModalBody.appendChild(appearance);
-
-  const categoriesSection = document.createElement('div');
-  categoriesSection.className = 'settings-section';
-  categoriesSection.innerHTML = `
-    <div class="settings-section-title">Categories &amp; Fields</div>
-    <div id="settings-category-list"></div>
-    <button class="btn btn-ghost btn-block btn-sm" id="settings-add-category-btn" style="margin-top:10px">+ New category</button>
-  `;
-  el.settingsModalBody.appendChild(categoriesSection);
 
   const securitySection = document.createElement('div');
   securitySection.className = 'settings-section';
@@ -546,7 +624,6 @@ async function openSettingsModal() {
   }
 
   await wireSettingsAppearance();
-  wireSettingsCategories();
   wireSettingsSecurity();
   wireSettingsData();
   if (adminSection) await wireSettingsAdmin();
@@ -585,133 +662,6 @@ async function wireSettingsAppearance() {
   try { stored = localStorage.getItem('waystone-particles-enabled') !== '0'; } catch (e) {}
   toggle.checked = stored;
   toggle.addEventListener('change', () => setParticlesEnabled(toggle.checked));
-}
-
-function wireSettingsCategories() {
-  const wrap = document.getElementById('settings-category-list');
-
-  function renderList() {
-    wrap.innerHTML = '';
-    for (const category of state.categories) {
-      const block = document.createElement('div');
-      block.className = 'category-block';
-
-      const head = document.createElement('div');
-      head.className = 'category-block-head';
-      const nameInput = document.createElement('input');
-      nameInput.className = 'input';
-      nameInput.value = category.name;
-      nameInput.style.flex = '1';
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'btn btn-danger btn-sm';
-      deleteBtn.textContent = 'Delete category';
-      deleteBtn.addEventListener('click', async () => {
-        if (!confirm(`Delete "${category.name}" and everything in it? This cannot be undone.`)) return;
-        await withSessionGuard(() => deleteCategory(category.id));
-        if (state.activeCategoryId === category.id) state.activeCategoryId = null;
-        await loadCategories();
-        renderList();
-      });
-      head.appendChild(nameInput);
-      head.appendChild(deleteBtn);
-      block.appendChild(head);
-
-      const fieldRows = document.createElement('div');
-      fieldRows.className = 'schema-fields';
-
-      function renderFields() {
-        fieldRows.innerHTML = '';
-        for (const field of category.fields) {
-          const row = document.createElement('div');
-          row.className = 'schema-field-row';
-
-          const fieldNameInput = document.createElement('input');
-          fieldNameInput.className = 'input';
-          fieldNameInput.value = field.name;
-          fieldNameInput.addEventListener('input', () => { field.name = fieldNameInput.value; });
-          row.appendChild(fieldNameInput);
-
-          const typeWrap = document.createElement('div');
-          typeWrap.className = 'isel';
-          typeWrap.style.minWidth = '120px';
-          buildIsel(typeWrap, FIELD_TYPES, field.type, (v) => {
-            field.type = v;
-            if (v === 'secret' && !field.subtype) field.subtype = 'password';
-            renderFields();
-          });
-          row.appendChild(typeWrap);
-
-          if (field.type === 'secret') {
-            const subtypeWrap = document.createElement('div');
-            subtypeWrap.className = 'isel';
-            subtypeWrap.style.minWidth = '140px';
-            buildIsel(subtypeWrap, SECRET_SUBTYPES, field.subtype || 'password', (v) => { field.subtype = v; });
-            row.appendChild(subtypeWrap);
-          }
-
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'btn-remove-field';
-          removeBtn.textContent = '✕';
-          removeBtn.addEventListener('click', () => {
-            category.fields = category.fields.filter(f => f !== field);
-            renderFields();
-          });
-          row.appendChild(removeBtn);
-
-          fieldRows.appendChild(row);
-        }
-      }
-      renderFields();
-      block.appendChild(fieldRows);
-
-      const addFieldBtn = document.createElement('button');
-      addFieldBtn.className = 'btn-add-field';
-      addFieldBtn.style.marginTop = '10px';
-      addFieldBtn.textContent = '+ Add Field';
-      addFieldBtn.addEventListener('click', () => {
-        category.fields.push({ id: newFieldId(), name: 'New field', type: 'text' });
-        renderFields();
-      });
-      block.appendChild(addFieldBtn);
-
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'btn btn-primary btn-sm';
-      saveBtn.textContent = 'Save';
-      saveBtn.style.marginTop = '12px';
-      saveBtn.addEventListener('click', async () => {
-        category.name = nameInput.value;
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving…';
-        try {
-          await withSessionGuard(() => saveCategory(category));
-          saveBtn.textContent = 'Saved ✓';
-          renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
-          updateTopbar();
-          setTimeout(() => { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1200);
-        } catch (e) {
-          saveBtn.textContent = 'Save';
-          saveBtn.disabled = false;
-          alert('Could not save: ' + e.message);
-        }
-      });
-      block.appendChild(saveBtn);
-
-      wrap.appendChild(block);
-    }
-  }
-  renderList();
-
-  document.getElementById('settings-add-category-btn').addEventListener('click', async () => {
-    const name = prompt('Category name');
-    if (!name) return;
-    const category = await withSessionGuard(() =>
-      createCategory({ id: newCategoryId(), name, icon: '📁', sortOrder: state.categories.length, fields: [] })
-    );
-    if (category === null) return;
-    state.categories.push(category);
-    renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
-    renderList();
-  });
 }
 
 function wireSettingsSecurity() {
@@ -812,7 +762,6 @@ function wireSettingsData() {
     }
     state.activeCategoryId = null;
     await loadCategories();
-    document.getElementById('settings-category-list').innerHTML = '';
     alert('All data deleted.');
   });
 }
