@@ -65,7 +65,7 @@ function ensureCanvas() {
   if (canvas) return;
   canvas = document.createElement('canvas');
   canvas.id = 'waystone-particles';
-  canvas.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;';
+  canvas.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;';
   document.body.prepend(canvas);
   ctx = canvas.getContext('2d');
   resize();
