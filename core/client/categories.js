@@ -26,6 +26,14 @@ function newCategoryId() {
 const FIELD_TYPES = ['text', 'integer', 'rich-text', 'secret'];
 const SECRET_SUBTYPES = ['password', 'totp', 'backup-codes'];
 
+/**
+ * There's no separate "Title"/"Subtitle" input anymore — an item's card
+ * title and subtitle are just the first two non-secret schema fields, in
+ * schema order (e.g. a Characters category with Name, Age, Allegiance
+ * uses Name as the title and Age as the subtitle). Centralized here since
+ * both the item editor (app.js) and the card renderer (items.js) need to
+ * agree on which fields those are.
+ */
 function pickTitleFields(fields) {
   const displayable = (fields || []).filter(f => f.type !== 'secret');
   const titleField = displayable[0] || null;
