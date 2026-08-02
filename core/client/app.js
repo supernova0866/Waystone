@@ -555,6 +555,8 @@ function showFieldContextMenu(e, { atTop, atBottom, onMoveTop, onMoveUp, onMoveD
 
   const menu = document.createElement('div');
   menu.className = 'field-context-menu';
+  menu.style.position = 'fixed';
+  menu.style.visibility = 'hidden';
 
   const options = [
     { label: 'Move to Top', action: onMoveTop, disabled: atTop },
@@ -586,6 +588,7 @@ function showFieldContextMenu(e, { atTop, atBottom, onMoveTop, onMoveUp, onMoveD
   if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
+  menu.style.visibility = 'visible';
 }
 
 /* ── Settings — now a modal instead of a page navigation. Settings used to
