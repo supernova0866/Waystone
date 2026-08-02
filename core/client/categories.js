@@ -1,66 +1,36 @@
-import { tursoExec, tursoSelect } from './turso-client.js';
-import { categoriesTable, itemsTable } from './schema.js';
-
-async function createCategory(client, userId, category) {
-  const table = categoriesTable(userId);
-  await tursoExec(
-    client,
-    `INSERT INTO ${table} (id, name, icon, sort_order, fields) VALUES (?, ?, ?, ?, ?)`,
-    [category.id, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || [])]
-  );
-  return { ...category, itemCount: 0 };
-}
-
-async function saveCategory(client, userId, category) {
-  const table = categoriesTable(userId);
-  await tursoExec(
-    client,
-    `INSERT INTO ${table} (id, name, icon, sort_order, fields)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       name       = excluded.name,
-       icon       = excluded.icon,
-       sort_order = excluded.sort_order,
-       fields     = excluded.fields`,
-    [category.id, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || [])]
-  );
-  return category;
-}
-
-async function deleteCategory(client, userId, categoryId) {
-  const catTable = categoriesTable(userId);
-  await tursoExec(client, `DELETE FROM ${itemsTable(userId)} WHERE category_id = ?`, [categoryId]);
-  await tursoExec(client, `DELETE FROM ${catTable} WHERE id = ?`, [categoryId]);
-}
-
-async function loadCategories(client, userId) {
-  const table = categoriesTable(userId);
-  const rows = await tursoSelect(client, `SELECT * FROM ${table} ORDER BY sort_order ASC`, []);
-
-  // One grouped query for every category's item count, rather than N queries
-  // (or the sidebar just never showing counts, which is what was happening).
-  // Tolerate this failing — a category list with blank counts beats one that
-  // doesn't load at all if the items table is ever in an unexpected state.
-  let counts = {};
-  try {
-    const countRows = await tursoSelect(
-      client,
-      `SELECT category_id, COUNT(*) as cnt FROM ${itemsTable(userId)} GROUP BY category_id`,
-      []
-    );
-    counts = Object.fromEntries(countRows.map(r => [r.category_id, Number(r.cnt) || 0]));
-  } catch (e) {
-    console.error('Failed to load item counts:', e.message);
+function renderSidebarList(container, categories, activeId, onSelect) {
+  container.innerHTML = '';
+  for (const cat of categories) {
+    const el = document.createElement('div');
+    el.className = 'tab-item' + (cat.id === activeId ? ' active' : '');
+    el.innerHTML = `
+      <span class="tab-icon">${cat.icon || '📁'}</span>
+      <span class="tab-label"></span>
+      <span class="tab-count"></span>
+    `;
+    el.querySelector('.tab-label').textContent = cat.name;
+    el.querySelector('.tab-count').textContent = cat.itemCount ?? '';
+    el.addEventListener('click', () => onSelect(cat.id));
+    container.appendChild(el);
   }
-
-  return rows.map(c => ({
-    id: c.id,
-    name: c.name,
-    icon: c.icon || '',
-    sortOrder: Number(c.sort_order) || 0,
-    fields: JSON.parse(c.fields || '[]'),
-    itemCount: counts[c.id] || 0,
-  }));
 }
 
-export { createCategory, saveCategory, deleteCategory, loadCategories };
+function newFieldId() {
+  return 'f' + Math.random().toString(36).slice(2, 8);
+}
+
+function newCategoryId() {
+  return 'c' + Math.random().toString(36).slice(2, 10);
+}
+
+const FIELD_TYPES = ['text', 'integer', 'rich-text', 'secret'];
+const SECRET_SUBTYPES = ['password', 'totp', 'backup-codes'];
+
+function pickTitleFields(fields) {
+  const displayable = (fields || []).filter(f => f.type !== 'secret');
+  const titleField = displayable[0] || null;
+  const subtitleField = displayable.find(f => f !== titleField) || null;
+  return { titleField, subtitleField };
+}
+
+export { renderSidebarList, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
