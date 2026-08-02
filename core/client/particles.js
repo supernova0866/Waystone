@@ -34,11 +34,30 @@ function resolveColor(token) {
   }
 }
 
-function hexToRgb(hex) {
-  const clean = hex.replace('#', '');
+/**
+ * Parses either #rgb/#rrggbb hex or an rgb()/rgba() string into {r,g,b}.
+ * The rgb()/rgba() branch matters specifically for browser-registered
+ * `<color>` custom properties (e.g. Cosmic's --accent, animated via
+ * @property) — computed-style reads of those serialize as rgb(...), not
+ * hex, so a hex-only parser silently produced white for every particle
+ * that was supposed to be colored with them.
+ */
+function parseColorToRgb(input) {
+  const str = (input || '').trim();
+
+  const rgbMatch = str.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+  if (rgbMatch) {
+    return {
+      r: Math.max(0, Math.min(255, Math.round(parseFloat(rgbMatch[1])))),
+      g: Math.max(0, Math.min(255, Math.round(parseFloat(rgbMatch[2])))),
+      b: Math.max(0, Math.min(255, Math.round(parseFloat(rgbMatch[3])))),
+    };
+  }
+
+  const clean = str.replace('#', '');
   const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
   const num = parseInt(full, 16);
-  if (Number.isNaN(num)) return { r: 255, g: 255, b: 255 };
+  if (Number.isNaN(num) || full.length !== 6) return { r: 255, g: 255, b: 255 };
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
 }
 
@@ -73,7 +92,7 @@ function resize() {
 /* ---------- particle factories, one per "type" in style.json ---------- */
 
 function spawnDriftLike(layer, w, h) {
-  const rgb = hexToRgb(resolveColor(layer.color));
+  const rgb = parseColorToRgb(resolveColor(layer.color));
   return {
     kind: 'dot',
     x: Math.random() * w,
@@ -89,7 +108,7 @@ function spawnDriftLike(layer, w, h) {
 }
 
 function spawnTwinkle(layer, w, h) {
-  const rgb = hexToRgb(resolveColor(layer.color));
+  const rgb = parseColorToRgb(resolveColor(layer.color));
   return {
     kind: 'twinkle',
     x: Math.random() * w,
@@ -107,7 +126,7 @@ function scheduleStreak(layer, w, h, list) {
   const delay = minMs + Math.random() * (maxMs - minMs);
   setTimeout(() => {
     if (!enabled) { scheduleStreak(layer, w, h, list); return; }
-    const rgb = hexToRgb(resolveColor(layer.color));
+    const rgb = parseColorToRgb(resolveColor(layer.color));
     const fromLeft = Math.random() > 0.5;
     const startX = fromLeft ? -20 : w + 20;
     const startY = Math.random() * h * 0.6;
