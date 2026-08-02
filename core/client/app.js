@@ -47,6 +47,9 @@ const el = {
   settingsModalBackdrop: document.getElementById('settings-modal-backdrop'),
   settingsModalBody: document.getElementById('settings-modal-body'),
   settingsModalClose: document.getElementById('settings-modal-close'),
+  categoryModalBackdrop: document.getElementById('category-modal-backdrop'),
+  categoryModalBody: document.getElementById('category-modal-body'),
+  categoryModalClose: document.getElementById('category-modal-close'),
 };
 
 function hideAllGates() {
@@ -328,10 +331,20 @@ function openSchemaEditor(category) {
   const nameField = document.createElement('div');
   nameField.className = 'field';
   nameField.innerHTML = `<label class="field-label">Tab name</label>`;
+  const nameRow = document.createElement('div');
+  nameRow.className = 'input-row';
+  const iconInput = document.createElement('input');
+  iconInput.className = 'input icon-input';
+  iconInput.maxLength = 4;
+  iconInput.title = 'Emoji icon for this category';
+  iconInput.value = working.icon || '📁';
+  iconInput.addEventListener('input', () => { working.icon = iconInput.value; });
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
   nameInput.value = working.name;
-  nameField.appendChild(nameInput);
+  nameRow.appendChild(iconInput);
+  nameRow.appendChild(nameInput);
+  nameField.appendChild(nameRow);
   el.schemaModalBody.appendChild(nameField);
 
   const fieldsLabel = document.createElement('label');
@@ -816,20 +829,79 @@ el.addItemBtn?.addEventListener('click', () => {
   openEditor({ id: null }, { title: '', subtitle: '', fields: {} });
 });
 
-el.addCategoryBtn?.addEventListener('click', async () => {
-  const name = prompt('Category name');
-  if (!name) return;
-  const category = await withSessionGuard(() =>
-    createCategory({ id: newCategoryId(), name, icon: '📁', sortOrder: state.categories.length, fields: [] })
-  );
-  if (category === null) return;
-  state.categories.push(category);
-  state.activeCategoryId = category.id;
-  renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
-  updateTopbar();
-  updateAddItemAvailability();
-  await loadItems();
-});
+el.addCategoryBtn?.addEventListener('click', () => openCategoryModal());
+
+function openCategoryModal() {
+  el.categoryModalBody.innerHTML = '';
+
+  const nameField = document.createElement('div');
+  nameField.className = 'field';
+  nameField.innerHTML = `<label class="field-label">Icon &amp; name</label>`;
+  const nameRow = document.createElement('div');
+  nameRow.className = 'input-row';
+  const iconInput = document.createElement('input');
+  iconInput.className = 'input icon-input';
+  iconInput.maxLength = 4;
+  iconInput.title = 'Emoji icon for this category';
+  iconInput.value = '📁';
+  const nameInput = document.createElement('input');
+  nameInput.className = 'input';
+  nameInput.placeholder = 'e.g. Characters';
+  nameRow.appendChild(iconInput);
+  nameRow.appendChild(nameInput);
+  nameField.appendChild(nameRow);
+  el.categoryModalBody.appendChild(nameField);
+
+  const errorEl = document.createElement('div');
+  errorEl.className = 'error-text';
+  errorEl.style.display = 'none';
+  el.categoryModalBody.appendChild(errorEl);
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  actions.innerHTML = `
+    <div class="modal-spacer"></div>
+    <button class="btn btn-ghost" id="category-cancel">Cancel</button>
+    <button class="btn btn-primary" id="category-create">Create</button>
+  `;
+  el.categoryModalBody.appendChild(actions);
+
+  actions.querySelector('#category-cancel').addEventListener('click', closeCategoryModal);
+  actions.querySelector('#category-create').addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      errorEl.textContent = 'Give the category a name.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    const createBtn = actions.querySelector('#category-create');
+    createBtn.disabled = true;
+    try {
+      const category = await withSessionGuard(() =>
+        createCategory({ id: newCategoryId(), name, icon: iconInput.value.trim() || '📁', sortOrder: state.categories.length, fields: [] })
+      );
+      if (category === null) return;
+      state.categories.push(category);
+      state.activeCategoryId = category.id;
+      renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
+      updateTopbar();
+      updateAddItemAvailability();
+      closeCategoryModal();
+      await loadItems();
+    } finally {
+      createBtn.disabled = false;
+    }
+  });
+
+  el.categoryModalBackdrop.style.display = 'flex';
+  nameInput.focus();
+}
+
+function closeCategoryModal() {
+  el.categoryModalBackdrop.style.display = 'none';
+}
+
+el.categoryModalClose.addEventListener('click', closeCategoryModal);
 
 el.lockBtn?.addEventListener('click', () => {
   lockVault();
