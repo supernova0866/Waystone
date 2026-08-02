@@ -163,21 +163,64 @@ function activeCategory() {
 
 async function loadItems() {
   clearItemDisposers();
-  const rows = await withSessionGuard(() => fetchItems(state.activeCategoryId));
-  if (rows === null) return;
-
+  const categoryId = state.activeCategoryId;
   const category = activeCategory();
-  const decrypted = [];
-  for (const row of rows) {
-    try {
-      const data = await decryptItemData(row);
-      decrypted.push({ item: row, data });
-    } catch (e) {
-      decrypted.push({ item: row, data: { title: '⚠ Could not decrypt', fields: {} } });
-    }
+
+  const knownCount = category?.itemCount ?? state.items.length;
+  renderSkeletons(knownCount > 0 ? knownCount : 1);
+
+  const rows = await withSessionGuard(() => fetchItems(categoryId));
+  if (rows === null) return;
+  if (state.activeCategoryId !== categoryId) return; // user already switched tabs again
+
+  if (rows.length === 0) {
+    state.items = [];
+    renderGrid(category, []);
+    return;
   }
-  state.items = decrypted;
-  renderGrid(category, decrypted);
+
+  if (rows.length !== knownCount) renderSkeletons(rows.length);
+  state.items = new Array(rows.length);
+
+  await Promise.all(rows.map(async (row, idx) => {
+    let data;
+    try {
+      data = await decryptItemData(row);
+    } catch (e) {
+      data = { title: '⚠ Could not decrypt', fields: {} };
+    }
+    if (state.activeCategoryId !== categoryId) return; // stale — a newer tab is active now
+    state.items[idx] = { item: row, data };
+    swapSkeletonForCard(idx, category, row, data);
+  }));
+}
+
+function renderSkeletons(count) {
+  el.cardGrid.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const skeleton = document.createElement('div');
+    skeleton.className = 'item-card item-card-skeleton';
+    skeleton.innerHTML = `
+      <div class="skeleton-line skeleton-title"></div>
+      <div class="skeleton-line skeleton-sub"></div>
+      <div class="skeleton-block"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line short"></div>
+    `;
+    el.cardGrid.appendChild(skeleton);
+  }
+}
+
+function swapSkeletonForCard(idx, category, item, data) {
+  const { card, dispose } = createItemCard(item, category, data, {
+    onOpen: (item) => openEditor(item, data),
+    onConsumeBackupCode: (item, field, codes) => consumeBackupCode(item, data, field, codes),
+  });
+  state.disposers.push(dispose);
+
+  const slot = el.cardGrid.children[idx];
+  if (slot) slot.replaceWith(card);
+  else el.cardGrid.appendChild(card);
 }
 
 function renderGrid(category, decryptedItems) {
@@ -188,14 +231,7 @@ function renderGrid(category, decryptedItems) {
     return;
   }
 
-  for (const { item, data } of decryptedItems) {
-    const { card, dispose } = createItemCard(item, category, data, {
-      onOpen: (item) => openEditor(item, data),
-      onConsumeBackupCode: (item, field, codes) => consumeBackupCode(item, data, field, codes),
-    });
-    state.disposers.push(dispose);
-    el.cardGrid.appendChild(card);
-  }
+  decryptedItems.forEach(({ item, data }, idx) => swapSkeletonForCard(idx, category, item, data));
 }
 
 async function consumeBackupCode(item, data, field, codes) {
@@ -285,6 +321,7 @@ function openEditor(item, data) {
   actions.querySelector('#modal-delete')?.addEventListener('click', async () => {
     if (!confirm('Delete this item? This cannot be undone.')) return;
     await withSessionGuard(() => deleteItem(item.id));
+    bumpCategoryCount(state.activeCategoryId, -1);
     closeEditor();
     await loadItems();
   });
@@ -303,6 +340,7 @@ function openEditor(item, data) {
         await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, ...enc }));
       } else {
         await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: state.activeCategoryId, ...enc }));
+        bumpCategoryCount(state.activeCategoryId, 1);
       }
       closeEditor();
       await loadItems();
@@ -312,6 +350,13 @@ function openEditor(item, data) {
   });
 
   el.modalBackdrop.style.display = 'flex';
+}
+
+function bumpCategoryCount(categoryId, delta) {
+  const category = state.categories.find(c => c.id === categoryId);
+  if (!category) return;
+  category.itemCount = Math.max(0, (category.itemCount || 0) + delta);
+  renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
 }
 
 function closeEditor() {
@@ -760,7 +805,7 @@ function wireSettingsData() {
         imported++;
       }
       alert(`Imported ${imported} item(s). Categories referenced by the file that no longer exist were skipped.`);
-      await loadItems();
+      await loadCategories();
     } catch (err) {
       alert('Import failed: ' + err.message);
     } finally {
