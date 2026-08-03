@@ -1,6 +1,6 @@
 import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword } from '/core/client/api.js';
 import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData } from '/core/client/crypto.js';
-import { createItemCard } from '/core/client/items.js';
+import { createItemCard, renderFieldRow } from '/core/client/items.js';
 import { renderSidebarList, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
@@ -50,6 +50,9 @@ const el = {
   categoryModalBackdrop: document.getElementById('category-modal-backdrop'),
   categoryModalBody: document.getElementById('category-modal-body'),
   categoryModalClose: document.getElementById('category-modal-close'),
+  viewModalBackdrop: document.getElementById('view-modal-backdrop'),
+  viewModalBody: document.getElementById('view-modal-body'),
+  viewModalClose: document.getElementById('view-modal-close'),
 };
 
 function hideAllGates() {
@@ -214,6 +217,7 @@ function renderSkeletons(count) {
 function swapSkeletonForCard(idx, category, item, data) {
   const { card, dispose } = createItemCard(item, category, data, {
     onOpen: (item) => openEditor(item, data),
+    onView: (item, category, data) => openViewModal(item, category, data),
     onConsumeBackupCode: (item, field, codes) => consumeBackupCode(item, data, field, codes),
   });
   state.disposers.push(dispose);
@@ -363,6 +367,64 @@ function closeEditor() {
   el.modalBackdrop.style.display = 'none';
 }
 
+/* ── View modal — read-only, shows every field on the item (not just the
+   truncated top-3 the compact card shows). Reuses renderFieldRow so TOTP
+   still ticks live, backup codes are still copyable/consumable, etc. Any
+   backup code consumed from here also needs the compact card's own hero
+   count refreshed, so on close we just reload the grid if anything changed
+   rather than trying to keep two live renders of the same field in sync. */
+
+let viewModalDisposers = [];
+let viewModalChanged = false;
+
+function openViewModal(item, category, data) {
+  el.viewModalBody.innerHTML = '';
+  viewModalDisposers = [];
+  viewModalChanged = false;
+
+  const head = document.createElement('div');
+  head.style.marginBottom = '18px';
+  head.innerHTML = `
+    <div class="item-card-title" style="font-size:18px"></div>
+    <div class="item-card-sub" style="margin-top:4px"></div>
+  `;
+  head.querySelector('.item-card-title').textContent = data.title || 'Untitled';
+  head.querySelector('.item-card-sub').textContent = data.subtitle || '';
+  el.viewModalBody.appendChild(head);
+
+  const rows = document.createElement('div');
+  rows.className = 'item-card-rows view-modal-rows';
+  for (const field of category?.fields || []) {
+    const value = data.fields ? data.fields[field.id] : undefined;
+    rows.appendChild(renderFieldRow(field, value, viewModalDisposers, async () => {
+      const remaining = await consumeBackupCode(item, data, field, value);
+      viewModalChanged = true;
+      return remaining;
+    }));
+  }
+  if (rows.children.length) el.viewModalBody.appendChild(rows);
+  else {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = 'This item has no fields.';
+    el.viewModalBody.appendChild(empty);
+  }
+
+  el.viewModalBackdrop.style.display = 'flex';
+}
+
+function closeViewModal() {
+  viewModalDisposers.forEach(fn => fn());
+  viewModalDisposers = [];
+  el.viewModalBackdrop.style.display = 'none';
+  if (viewModalChanged) {
+    viewModalChanged = false;
+    loadItems();
+  }
+}
+
+el.viewModalClose.addEventListener('click', closeViewModal);
+
 /* ── Schema editor — reachable directly from the topbar, one field-row-per-field,
    mirrors the compact editor from Settings but scoped to a single category so
    the flow is "click Edit Schema on the category you're looking at" rather than
@@ -427,7 +489,7 @@ function openSchemaEditor(category) {
       typeWrap.style.minWidth = '120px';
       buildIsel(typeWrap, FIELD_TYPES, field.type, (v) => {
         field.type = v;
-        if (v === 'secret' && !field.subtype) field.subtype = 'password';
+        if (v === 'secret') { field.copyable = false; if (!field.subtype) field.subtype = 'password'; }
         renderFields();
       });
       row.appendChild(typeWrap);
@@ -438,6 +500,20 @@ function openSchemaEditor(category) {
         subtypeWrap.style.minWidth = '140px';
         buildIsel(subtypeWrap, SECRET_SUBTYPES, field.subtype || 'password', (v) => { field.subtype = v; });
         row.appendChild(subtypeWrap);
+      } else {
+        const copyToggle = document.createElement('button');
+        copyToggle.className = 'btn-copyable-toggle' + (field.copyable ? ' active' : '');
+        copyToggle.textContent = '⧉';
+        copyToggle.title = field.copyable
+          ? 'Shows a copy button on the card (click to unset)'
+          : 'Mark as copyable — shows a copy button on the card. Only one field per category can be copyable.';
+        copyToggle.addEventListener('click', () => {
+          const turningOn = !field.copyable;
+          working.fields.forEach(f => { f.copyable = false; });
+          field.copyable = turningOn;
+          renderFields();
+        });
+        row.appendChild(copyToggle);
       }
 
       const removeBtn = document.createElement('button');
