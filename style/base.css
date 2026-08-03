@@ -314,7 +314,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
-  height: 300px;
+  height: 260px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -337,9 +337,12 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .item-card-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .item-card-rows { display: flex; flex-direction: column; gap: 8px; }
-.item-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.item-card-row { display: flex; align-items: center; gap: 8px; }
 .item-card-row-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
-.item-card-row-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.item-card-row-value-wrap { flex: 1; min-width: 0; display: flex; justify-content: flex-end; }
+.item-card-row-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; width: 100%; }
+.item-card-row-action-slot { flex-shrink: 0; width: 24px; display: flex; justify-content: flex-end; }
+.item-card-row-action-btn { width: 24px; height: 24px; padding: 0; font-size: 11.5px; }
 
 /* Bottom-right edit affordance, present on every card regardless of type/content length */
 .item-card-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 12px; }
@@ -387,18 +390,21 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .secret-dots::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .secret-dots::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 .secret-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
-.secret-actions .btn-icon { width: 34px; height: 34px; padding: 0; font-size: 14px; flex-shrink: 0; }
+.secret-actions .btn-icon { width: 28px; height: 28px; padding: 0; font-size: 12.5px; flex-shrink: 0; }
 
-/* View modal: give password rows their own line — a boxed field reads
-   better full-width than squeezed to the right of its label. TOTP/backup
-   rows (which also use .secret-value) are short and stay inline via the
-   .secret-dots-specific :has() selector below. */
+/* View modal: give the boxed password row its own line — reads better
+   full-width than squeezed next to its label. It also picks up an empty
+   action-slot from the shared fieldRow structure (it doesn't need one,
+   its reveal/copy buttons live inside .secret-value already) — hidden
+   below so it doesn't leave dead space next to the box. */
 .view-modal-rows .item-card-row:has(.secret-dots) {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
 }
 .view-modal-rows .item-card-row:has(.secret-dots) .secret-value { width: 100%; max-width: 100%; }
+.view-modal-rows .item-card-row:has(.secret-dots) .item-card-row-action-slot { display: none; }
+.view-modal-rows .item-card-row:has(.secret-dots) .item-card-row-value-wrap { width: 100%; }
 
 /* TOTP card specifics — Google Authenticator style: big code + depleting bar */
 .totp-block { padding-top: 4px; }
@@ -470,6 +476,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   scrollbar-width: thin;
 }
 .password-hero-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.password-hero-actions .btn-icon { width: 24px; height: 24px; padding: 0; font-size: 11.5px; }
 
 /* Any hero block sits above the remaining fields with its own breathing room */
 .totp-block, .backup-hero, .password-hero { margin-bottom: 14px; }
@@ -575,7 +582,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
    prefers-reduced-motion via the global `* { animation: none }` rule
    near the top of this file, so no extra media query needed here. */
 
-.item-card-skeleton { gap: 10px; cursor: default; height: 300px; }
+.item-card-skeleton { gap: 10px; cursor: default; height: 260px; }
 .skeleton-line, .skeleton-block {
   border-radius: var(--radius);
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
