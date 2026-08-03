@@ -32,7 +32,6 @@ const el = {
 
   app: document.getElementById('app-shell'),
   sidebar: document.getElementById('app-sidebar'),
-  sidebarToggleBtn: document.getElementById('sidebar-toggle-btn'),
   topbarSidebarToggle: document.getElementById('topbar-sidebar-toggle'),
   sidebarList: document.getElementById('sidebar-list'),
   topbarTitle: document.getElementById('topbar-title'),
@@ -1032,11 +1031,11 @@ function closeCategoryModal() {
 
 el.categoryModalClose.addEventListener('click', closeCategoryModal);
 
-/* ── Sidebar collapse — the toggle used to live only inside the sidebar
-   itself, so collapsing it also hid the only control that could bring it
-   back (nothing short of a page refresh recovered it). The topbar toggle
-   is always visible regardless of collapsed state; both call the same
-   function, and the preference persists across reloads. ────────────── */
+/* ── Sidebar collapse — toggle lives in the topbar, outside the sidebar
+   itself, so it stays reachable even when the sidebar is collapsed (an
+   in-sidebar toggle used to hide itself along with everything else, with
+   nothing short of a refresh able to bring it back). Preference persists
+   across reloads. ──────────────────────────────────────────────────── */
 
 function setSidebarCollapsed(collapsed) {
   el.sidebar?.classList.toggle('collapsed', collapsed);
@@ -1053,7 +1052,6 @@ function toggleSidebar() {
   } catch (e) {}
 })();
 
-el.sidebarToggleBtn?.addEventListener('click', toggleSidebar);
 el.topbarSidebarToggle?.addEventListener('click', toggleSidebar);
 
 el.lockBtn?.addEventListener('click', () => {
