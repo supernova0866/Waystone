@@ -70,7 +70,7 @@
         </span>
         WayStone
       </div>
-      <button class="btn btn-icon btn-ghost" style="width:26px;height:26px" onclick="document.getElementById('app-sidebar').classList.toggle('collapsed')" title="Toggle sidebar">☰</button>
+      <button class="btn btn-icon btn-ghost" style="width:26px;height:26px" id="sidebar-toggle-btn" title="Toggle sidebar">☰</button>
     </div>
     <div class="sidebar-list" id="sidebar-list"></div>
     <div class="sidebar-foot">
@@ -85,6 +85,7 @@
 
   <div class="main-area">
     <div class="topbar">
+      <button class="btn btn-icon btn-ghost" id="topbar-sidebar-toggle" style="width:30px;height:30px" title="Toggle sidebar">☰</button>
       <div class="topbar-title" id="topbar-title">WayStone</div>
       <div class="topbar-actions">
         <button class="btn btn-ghost btn-sm" id="edit-schema-btn">⚙ Edit Schema</button>
