@@ -1,3 +1,5 @@
+import { pickTitleFields } from './categories.js';
+
 function base32Decode(input) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const clean = input.replace(/=+$/, '').toUpperCase().replace(/\s+/g, '');
@@ -37,6 +39,11 @@ function copyText(value) {
   navigator.clipboard?.writeText(value).catch(() => {});
 }
 
+function truncateStr(value, max = 12) {
+  const s = String(value ?? '');
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
 function fieldRow(label, valueEl) {
   const row = document.createElement('div');
   row.className = 'item-card-row';
@@ -48,10 +55,35 @@ function fieldRow(label, valueEl) {
   return row;
 }
 
-function renderTextRow(field, value) {
+/**
+ * Plain text/integer/rich-text field row. `truncateValue` is used for the
+ * compact card body (12 chars + "…"); the View modal calls this with it
+ * left off to show the full value. A field marked `copyable` in its schema
+ * (see categories.js schema editor) gets a copy button regardless of which
+ * mode this is rendered in — the button always copies the untruncated value.
+ */
+function renderTextRow(field, value, { truncateValue = false } = {}) {
+  const displayValue = truncateValue ? truncateStr(value) : (value ?? '');
+
+  if (field.copyable) {
+    const wrap = document.createElement('span');
+    wrap.className = 'secret-value';
+    const valueEl = document.createElement('span');
+    valueEl.className = 'item-card-row-value';
+    valueEl.textContent = displayValue;
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-icon';
+    copyBtn.title = 'Copy';
+    copyBtn.textContent = '⧉';
+    copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(value ?? ''); flashCopied(copyBtn); });
+    wrap.appendChild(valueEl);
+    wrap.appendChild(copyBtn);
+    return fieldRow(field.name, wrap);
+  }
+
   const valueEl = document.createElement('span');
   valueEl.className = 'item-card-row-value';
-  valueEl.textContent = value ?? '';
+  valueEl.textContent = displayValue;
   return fieldRow(field.name, valueEl);
 }
 
@@ -159,6 +191,20 @@ function renderBackupCodesRow(field, codes, onConsume) {
   wrap.appendChild(actions);
 
   return fieldRow(field.name, wrap);
+}
+
+/**
+ * Dispatches to the right row renderer for any field, regardless of type —
+ * used by the View modal to show every field on an item, not just the
+ * truncated top-3 the compact card shows.
+ */
+function renderFieldRow(field, value, disposers, onConsumeBackupCode) {
+  if (field.type === 'secret') {
+    if (field.subtype === 'totp') return renderTotpRow(field, value, disposers);
+    if (field.subtype === 'backup-codes') return renderBackupCodesRow(field, value, onConsumeBackupCode);
+    return renderSecretPasswordRow(field, value);
+  }
+  return renderTextRow(field, value);
 }
 
 /* ── Hero renderers ───────────────────────────────────────────────────────
@@ -309,6 +355,16 @@ function createItemCard(item, category, data, callbacks = {}) {
   const featured = fields.find(f => f.type === 'secret') || null;
   const featuredSubtype = featured?.subtype || 'password';
 
+  // The compact card body shows at most 3 fields: non-secret, and not
+  // whichever fields are already doing double duty as the title/subtitle
+  // in the header above (see pickTitleFields in categories.js). Anything
+  // beyond that — including every other secret field — is still on the
+  // item, just only visible via the View modal now.
+  const { titleField, subtitleField } = pickTitleFields(fields);
+  const bodyFields = fields
+    .filter(f => f.type !== 'secret' && f !== titleField && f !== subtitleField)
+    .slice(0, 3);
+
   const card = document.createElement('div');
   card.className = 'item-card' + (featured ? ` item-card--${featuredSubtype}` : '');
   card.dataset.itemId = item.id;
@@ -317,7 +373,7 @@ function createItemCard(item, category, data, callbacks = {}) {
   head.className = 'item-card-head';
   const typeBadge = featured ? TYPE_BADGE[featuredSubtype] || TYPE_BADGE.password : null;
   head.innerHTML = `
-    <div>
+    <div class="item-card-headings">
       <div class="item-card-title"></div>
       <div class="item-card-sub"></div>
     </div>
@@ -343,39 +399,38 @@ function createItemCard(item, category, data, callbacks = {}) {
 
   const rows = document.createElement('div');
   rows.className = 'item-card-rows';
-
-  for (const field of fields) {
-    if (field === featured) continue; // already shown as the card's hero, above
+  for (const field of bodyFields) {
     const value = data.fields ? data.fields[field.id] : undefined;
-    if (field.type === 'secret') {
-      if (field.subtype === 'totp') {
-        rows.appendChild(renderTotpRow(field, value, disposers));
-      } else if (field.subtype === 'backup-codes') {
-        rows.appendChild(renderBackupCodesRow(field, value, () => callbacks.onConsumeBackupCode?.(item, field, value)));
-      } else {
-        rows.appendChild(renderSecretPasswordRow(field, value));
-      }
-    } else {
-      rows.appendChild(renderTextRow(field, value));
-    }
+    rows.appendChild(renderTextRow(field, value, { truncateValue: true }));
   }
-
   if (rows.children.length) card.appendChild(rows);
 
   const footer = document.createElement('div');
   footer.className = 'item-card-footer';
+
+  const viewBtn = document.createElement('button');
+  viewBtn.className = 'btn btn-icon btn-ghost item-card-icon-btn';
+  viewBtn.title = 'View all fields';
+  viewBtn.textContent = '👁';
+  viewBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    callbacks.onView?.(item, category, data);
+  });
+
   const editBtn = document.createElement('button');
-  editBtn.className = 'btn btn-icon btn-ghost item-card-edit-btn';
+  editBtn.className = 'btn btn-icon btn-ghost item-card-icon-btn';
   editBtn.title = 'Edit';
   editBtn.textContent = '✎';
   editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     callbacks.onOpen?.(item);
   });
+
+  footer.appendChild(viewBtn);
   footer.appendChild(editBtn);
   card.appendChild(footer);
 
   return { card, dispose: () => disposers.forEach(fn => fn()) };
 }
 
-export { createItemCard, totpCode, base32Decode };
+export { createItemCard, renderFieldRow, totpCode, base32Decode };
