@@ -1,5 +1,3 @@
-import { pickTitleFields } from './categories.js';
-
 function base32Decode(input) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const clean = input.replace(/=+$/, '').toUpperCase().replace(/\s+/g, '');
@@ -355,15 +353,10 @@ function createItemCard(item, category, data, callbacks = {}) {
   const featured = fields.find(f => f.type === 'secret') || null;
   const featuredSubtype = featured?.subtype || 'password';
 
-  // The compact card body shows at most 3 fields: non-secret, and not
-  // whichever fields are already doing double duty as the title/subtitle
-  // in the header above (see pickTitleFields in categories.js). Anything
-  // beyond that — including every other secret field — is still on the
-  // item, just only visible via the View modal now.
-  const { titleField, subtitleField } = pickTitleFields(fields);
-  const bodyFields = fields
-    .filter(f => f.type !== 'secret' && f !== titleField && f !== subtitleField)
-    .slice(0, 3);
+  // The compact card body shows at most 3 fields: the first 3 non-secret
+  // fields in schema order. Anything beyond that — including every other
+  // secret field — is still on the item, just only visible via View.
+  const bodyFields = fields.filter(f => f.type !== 'secret').slice(0, 3);
 
   const card = document.createElement('div');
   card.className = 'item-card' + (featured ? ` item-card--${featuredSubtype}` : '');
