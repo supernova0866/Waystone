@@ -314,6 +314,8 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
+  height: 300px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: border-color 0.15s, transform 0.1s;
@@ -330,25 +332,26 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   margin-bottom: 10px;
 }
 .item-card-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.item-card-title { font-weight: 600; color: var(--text-strong); font-size: 15px; }
-.item-card-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.item-card-headings { min-width: 0; }
+.item-card-title { font-weight: 600; color: var(--text-strong); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-card-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .item-card-rows { display: flex; flex-direction: column; gap: 8px; }
 .item-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .item-card-row-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
-.item-card-row-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-card-row-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* Bottom-right edit affordance, present on every card regardless of type/content length */
-.item-card-footer { display: flex; justify-content: flex-end; margin-top: auto; padding-top: 12px; }
-.item-card-edit-btn {
+.item-card-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 12px; }
+.item-card-icon-btn {
   width: 28px; height: 28px; padding: 0;
   font-size: 13px;
   color: var(--text-muted);
   opacity: 0.7;
   transition: opacity 0.15s, color 0.15s, border-color 0.15s;
 }
-.item-card:hover .item-card-edit-btn { opacity: 1; }
-.item-card-edit-btn:hover { color: var(--accent); border-color: var(--accent-strong); }
+.item-card:hover .item-card-icon-btn { opacity: 1; }
+.item-card-icon-btn:hover { color: var(--accent); border-color: var(--accent-strong); }
 
 /* Secret (password) value: masked dots + reveal/copy */
 .secret-value {
@@ -356,9 +359,17 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   font-family: var(--font-mono);
   font-size: 14px;
   letter-spacing: 0.03em;
+  min-width: 0;
 }
-.secret-dots { color: var(--text-muted); user-select: none; }
-.secret-actions { display: flex; gap: 4px; margin-left: auto; }
+.secret-dots {
+  color: var(--text-muted);
+  user-select: none;
+  overflow-x: auto;
+  white-space: nowrap;
+  min-width: 0;
+  scrollbar-width: thin;
+}
+.secret-actions { display: flex; gap: 4px; margin-left: auto; flex-shrink: 0; }
 .secret-actions .btn-icon { width: 26px; height: 26px; padding: 0; font-size: 13px; }
 
 /* TOTP card specifics — Google Authenticator style: big code + depleting bar */
@@ -424,11 +435,29 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   letter-spacing: 0.14em;
   color: var(--text-muted);
   user-select: none;
+  overflow-x: auto;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: thin;
 }
-.password-hero-actions { display: flex; gap: 4px; }
+.password-hero-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* Any hero block sits above the remaining fields with its own breathing room */
 .totp-block, .backup-hero, .password-hero { margin-bottom: 14px; }
+
+/* View modal shows full, untruncated values — wraps instead of the compact
+   card's single-line ellipsis, and isn't height-constrained like the card. */
+.view-modal-rows .item-card-row {
+  align-items: flex-start;
+  gap: 16px;
+}
+.view-modal-rows .item-card-row-value {
+  white-space: normal;
+  word-break: break-word;
+  text-overflow: clip;
+  overflow: visible;
+}
 
 /* Copy feedback toast on a card */
 .copied-flash {
@@ -449,6 +478,22 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 }
 .schema-field-row .input { flex: 1; min-width: 140px; font-family: var(--font-sans); font-size: 13px; padding: 8px 10px; }
 .schema-field-extra { flex: 1 1 100%; }
+.btn-copyable-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 7px 9px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.btn-copyable-toggle:hover { border-color: var(--accent-strong); color: var(--text); }
+.btn-copyable-toggle.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .btn-remove-field {
   background: none; border: none; color: var(--danger);
   cursor: pointer; font-size: 15px; padding: 4px 7px;
@@ -502,7 +547,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
    prefers-reduced-motion via the global `* { animation: none }` rule
    near the top of this file, so no extra media query needed here. */
 
-.item-card-skeleton { gap: 10px; cursor: default; }
+.item-card-skeleton { gap: 10px; cursor: default; height: 300px; }
 .skeleton-line, .skeleton-block {
   border-radius: var(--radius);
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
