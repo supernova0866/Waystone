@@ -313,8 +313,8 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px;
-  height: 260px;
+  padding: 13px;
+  height: 224px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -329,14 +329,14 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 
 .item-card-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 7px;
 }
 .item-card-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .item-card-headings { min-width: 0; }
 .item-card-title { font-weight: 600; color: var(--text-strong); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-card-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.item-card-rows { display: flex; flex-direction: column; gap: 8px; }
+.item-card-rows { display: flex; flex-direction: column; gap: 5px; }
 .item-card-row { display: flex; align-items: center; gap: 8px; }
 .item-card-row-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; }
 .item-card-row-value-wrap { flex: 1; min-width: 0; display: flex; justify-content: flex-end; }
@@ -345,10 +345,10 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .item-card-row-action-btn { width: 24px; height: 24px; padding: 0; font-size: 11.5px; }
 
 /* Bottom-right edit affordance, present on every card regardless of type/content length */
-.item-card-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 12px; }
+.item-card-footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: auto; padding-top: 7px; }
 .item-card-icon-btn {
-  width: 28px; height: 28px; padding: 0;
-  font-size: 13px;
+  width: 24px; height: 24px; padding: 0;
+  font-size: 12px;
   color: var(--text-muted);
   opacity: 0.7;
   transition: opacity 0.15s, color 0.15s, border-color 0.15s;
@@ -368,7 +368,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  height: 40px;
+  height: 36px;
   display: flex;
   align-items: center;
   background: var(--surface-2);
@@ -479,7 +479,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 .password-hero-actions .btn-icon { width: 24px; height: 24px; padding: 0; font-size: 11.5px; }
 
 /* Any hero block sits above the remaining fields with its own breathing room */
-.totp-block, .backup-hero, .password-hero { margin-bottom: 14px; }
+.totp-block, .backup-hero, .password-hero { margin-bottom: 8px; }
 
 /* View modal shows full, untruncated values — wraps instead of the compact
    card's single-line ellipsis, and isn't height-constrained like the card. */
@@ -582,7 +582,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: 
    prefers-reduced-motion via the global `* { animation: none }` rule
    near the top of this file, so no extra media query needed here. */
 
-.item-card-skeleton { gap: 10px; cursor: default; height: 260px; }
+.item-card-skeleton { gap: 6px; cursor: default; height: 224px; }
 .skeleton-line, .skeleton-block {
   border-radius: var(--radius);
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
