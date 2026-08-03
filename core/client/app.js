@@ -21,12 +21,14 @@ const el = {
   loginError: document.getElementById('login-error'),
   loginUsername: document.getElementById('login-username'),
   loginPassword: document.getElementById('login-password'),
+  loginSubmit: document.getElementById('login-submit'),
 
   unlockGate: document.getElementById('unlock-gate'),
   unlockForm: document.getElementById('unlock-form'),
   unlockError: document.getElementById('unlock-error'),
   unlockUsernameLabel: document.getElementById('unlock-username-label'),
   unlockPassword: document.getElementById('unlock-password'),
+  unlockSubmit: document.getElementById('unlock-submit'),
 
   app: document.getElementById('app-shell'),
   sidebarList: document.getElementById('sidebar-list'),
@@ -1042,6 +1044,25 @@ el.logoutBtn?.addEventListener('click', async () => {
   showLoginGate();
 });
 
+const LOADING_DOT_CYCLE = ['.', '..', '...', '..', '.', '...', '..'];
+
+function startButtonLoading(btn, label) {
+  btn.disabled = true;
+  let i = 0;
+  btn.textContent = `${label} ${LOADING_DOT_CYCLE[i]}`;
+  const interval = setInterval(() => {
+    i = (i + 1) % LOADING_DOT_CYCLE.length;
+    btn.textContent = `${label} ${LOADING_DOT_CYCLE[i]}`;
+  }, 380);
+  return () => clearInterval(interval);
+}
+
+function stopButtonLoading(btn, stopInterval, originalText) {
+  stopInterval();
+  btn.disabled = false;
+  btn.textContent = originalText;
+}
+
 el.loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = el.loginUsername.value.trim();
@@ -1049,6 +1070,8 @@ el.loginForm.addEventListener('submit', async (e) => {
   if (!username || !password) return;
 
   el.loginError.textContent = '';
+  const originalText = el.loginSubmit.textContent;
+  const stopLoading = startButtonLoading(el.loginSubmit, 'Logging in');
   try {
     const result = await login(username, password);
     await unlockVault(password, result.salt);
@@ -1057,6 +1080,8 @@ el.loginForm.addEventListener('submit', async (e) => {
     await showApp();
   } catch (err) {
     el.loginError.textContent = 'Incorrect username or password.';
+  } finally {
+    stopButtonLoading(el.loginSubmit, stopLoading, originalText);
   }
 });
 
@@ -1065,6 +1090,8 @@ el.unlockForm.addEventListener('submit', async (e) => {
   const password = el.unlockPassword.value;
   if (!password) return;
   el.unlockError.textContent = '';
+  const originalText = el.unlockSubmit.textContent;
+  const stopLoading = startButtonLoading(el.unlockSubmit, 'Unlocking');
   try {
     const session = await checkSession();
     if (!session.authenticated) { handleSessionExpired(); return; }
@@ -1074,6 +1101,8 @@ el.unlockForm.addEventListener('submit', async (e) => {
     await showApp();
   } catch (err) {
     el.unlockError.textContent = 'Could not unlock with that password.';
+  } finally {
+    stopButtonLoading(el.unlockSubmit, stopLoading, originalText);
   }
 });
 
