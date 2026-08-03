@@ -31,6 +31,9 @@ const el = {
   unlockSubmit: document.getElementById('unlock-submit'),
 
   app: document.getElementById('app-shell'),
+  sidebar: document.getElementById('app-sidebar'),
+  sidebarToggleBtn: document.getElementById('sidebar-toggle-btn'),
+  topbarSidebarToggle: document.getElementById('topbar-sidebar-toggle'),
   sidebarList: document.getElementById('sidebar-list'),
   topbarTitle: document.getElementById('topbar-title'),
   cardGrid: document.getElementById('card-grid'),
@@ -1028,6 +1031,30 @@ function closeCategoryModal() {
 }
 
 el.categoryModalClose.addEventListener('click', closeCategoryModal);
+
+/* ── Sidebar collapse — the toggle used to live only inside the sidebar
+   itself, so collapsing it also hid the only control that could bring it
+   back (nothing short of a page refresh recovered it). The topbar toggle
+   is always visible regardless of collapsed state; both call the same
+   function, and the preference persists across reloads. ────────────── */
+
+function setSidebarCollapsed(collapsed) {
+  el.sidebar?.classList.toggle('collapsed', collapsed);
+  try { localStorage.setItem('waystone-sidebar-collapsed', collapsed ? '1' : '0'); } catch (e) {}
+}
+
+function toggleSidebar() {
+  setSidebarCollapsed(!el.sidebar?.classList.contains('collapsed'));
+}
+
+(function applyStoredSidebarState() {
+  try {
+    if (localStorage.getItem('waystone-sidebar-collapsed') === '1') setSidebarCollapsed(true);
+  } catch (e) {}
+})();
+
+el.sidebarToggleBtn?.addEventListener('click', toggleSidebar);
+el.topbarSidebarToggle?.addEventListener('click', toggleSidebar);
 
 el.lockBtn?.addEventListener('click', () => {
   lockVault();
