@@ -42,14 +42,25 @@ function truncateStr(value, max = 12) {
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
-function fieldRow(label, valueEl) {
+function fieldRow(label, valueEl, actionEl = null) {
   const row = document.createElement('div');
   row.className = 'item-card-row';
+
   const labelEl = document.createElement('span');
   labelEl.className = 'item-card-row-label';
   labelEl.textContent = label;
   row.appendChild(labelEl);
-  row.appendChild(valueEl);
+
+  const valueWrap = document.createElement('span');
+  valueWrap.className = 'item-card-row-value-wrap';
+  valueWrap.appendChild(valueEl);
+  row.appendChild(valueWrap);
+
+  const actionSlot = document.createElement('span');
+  actionSlot.className = 'item-card-row-action-slot';
+  if (actionEl) actionSlot.appendChild(actionEl);
+  row.appendChild(actionSlot);
+
   return row;
 }
 
@@ -63,25 +74,19 @@ function fieldRow(label, valueEl) {
 function renderTextRow(field, value, { truncateValue = false } = {}) {
   const displayValue = truncateValue ? truncateStr(value) : (value ?? '');
 
-  if (field.copyable) {
-    const wrap = document.createElement('span');
-    wrap.className = 'secret-value';
-    const valueEl = document.createElement('span');
-    valueEl.className = 'item-card-row-value';
-    valueEl.textContent = displayValue;
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn btn-icon';
-    copyBtn.title = 'Copy';
-    copyBtn.textContent = '⧉';
-    copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(value ?? ''); flashCopied(copyBtn); });
-    wrap.appendChild(valueEl);
-    wrap.appendChild(copyBtn);
-    return fieldRow(field.name, wrap);
-  }
-
   const valueEl = document.createElement('span');
   valueEl.className = 'item-card-row-value';
   valueEl.textContent = displayValue;
+
+  if (field.copyable) {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-icon item-card-row-action-btn';
+    copyBtn.title = 'Copy';
+    copyBtn.textContent = '⧉';
+    copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(value ?? ''); flashCopied(copyBtn); });
+    return fieldRow(field.name, valueEl, copyBtn);
+  }
+
   return fieldRow(field.name, valueEl);
 }
 
@@ -123,19 +128,14 @@ function renderSecretPasswordRow(field, value) {
 }
 
 function renderTotpRow(field, secret, disposers) {
-  const wrap = document.createElement('span');
-  wrap.className = 'secret-value';
-  wrap.style.cursor = 'pointer';
-
   const codeEl = document.createElement('span');
-  codeEl.className = 'mono';
-  codeEl.style.fontSize = '14px';
+  codeEl.className = 'mono item-card-row-value';
+  codeEl.style.cursor = 'pointer';
   codeEl.style.letterSpacing = '0.1em';
   codeEl.style.color = 'var(--text-strong)';
   codeEl.textContent = '······';
 
-  wrap.appendChild(codeEl);
-  wrap.addEventListener('click', (e) => {
+  codeEl.addEventListener('click', (e) => {
     e.stopPropagation();
     copyText((codeEl.dataset.raw || '').trim());
     flashCopied(codeEl);
@@ -154,16 +154,12 @@ function renderTotpRow(field, secret, disposers) {
   const interval = setInterval(tick, 1000);
   disposers.push(() => { cancelled = true; clearInterval(interval); });
 
-  return fieldRow(field.name, wrap);
+  return fieldRow(field.name, codeEl);
 }
 
 function renderBackupCodesRow(field, codes, onConsume) {
-  const wrap = document.createElement('span');
-  wrap.className = 'secret-value';
-
   const countEl = document.createElement('span');
-  countEl.className = 'mono';
-  countEl.style.fontSize = '13px';
+  countEl.className = 'mono item-card-row-value';
   countEl.style.color = 'var(--text-muted)';
 
   function updateCount(list) {
@@ -172,23 +168,17 @@ function renderBackupCodesRow(field, codes, onConsume) {
   updateCount(codes || []);
 
   const copyBtn = document.createElement('button');
-  copyBtn.className = 'btn btn-icon';
+  copyBtn.className = 'btn btn-icon item-card-row-action-btn';
   copyBtn.title = 'Copy next code';
   copyBtn.textContent = '⧉';
-  copyBtn.addEventListener('click', async () => {
+  copyBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
     const remaining = await onConsume();
     updateCount(remaining);
     flashCopied(copyBtn);
   });
 
-  const actions = document.createElement('span');
-  actions.className = 'secret-actions';
-  actions.appendChild(copyBtn);
-
-  wrap.appendChild(countEl);
-  wrap.appendChild(actions);
-
-  return fieldRow(field.name, wrap);
+  return fieldRow(field.name, countEl, copyBtn);
 }
 
 /**
