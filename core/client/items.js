@@ -311,22 +311,9 @@ function renderPasswordHero(field, value) {
   const dots = document.createElement('span');
   dots.className = 'password-hero-dots';
   dots.textContent = '••••••••••••';
-  dots.dataset.revealed = '0';
 
   const actions = document.createElement('span');
   actions.className = 'password-hero-actions';
-
-  const revealBtn = document.createElement('button');
-  revealBtn.className = 'btn btn-icon btn-ghost';
-  revealBtn.title = 'Reveal';
-  revealBtn.textContent = '👁';
-  revealBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const revealed = dots.dataset.revealed === '1';
-    dots.textContent = revealed ? '••••••••••••' : (value ?? '');
-    dots.dataset.revealed = revealed ? '0' : '1';
-    revealBtn.textContent = revealed ? '👁' : '🙈';
-  });
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'btn btn-icon btn-ghost';
@@ -334,7 +321,6 @@ function renderPasswordHero(field, value) {
   copyBtn.textContent = '⧉';
   copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copyText(value ?? ''); flashCopied(copyBtn); });
 
-  actions.appendChild(revealBtn);
   actions.appendChild(copyBtn);
   wrap.appendChild(dots);
   wrap.appendChild(actions);
