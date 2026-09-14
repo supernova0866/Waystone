@@ -1,38 +1,33 @@
 import { tursoExec, tursoSelect } from './turso-client.js';
-import { itemsTable } from './schema.js';
 
 async function createItem(client, userId, item) {
-  const table = itemsTable(userId);
   const now = new Date().toISOString();
   await tursoExec(
     client,
-    `INSERT INTO ${table} (id, category_id, data_enc, iv, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [item.id, item.categoryId, item.dataEnc, item.iv, now, now]
+    `INSERT INTO items (id, user_id, category_id, data_enc, iv, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [item.id, userId, item.categoryId, item.dataEnc, item.iv, now, now]
   );
   return { ...item, createdAt: now, updatedAt: now };
 }
 
 async function saveItem(client, userId, item) {
-  const table = itemsTable(userId);
   const now = new Date().toISOString();
   await tursoExec(
     client,
-    `UPDATE ${table} SET data_enc = ?, iv = ?, updated_at = ? WHERE id = ?`,
-    [item.dataEnc, item.iv, now, item.id]
+    `UPDATE items SET data_enc = ?, iv = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+    [item.dataEnc, item.iv, now, item.id, userId]
   );
   return { ...item, updatedAt: now };
 }
 
 async function deleteItem(client, userId, itemId) {
-  const table = itemsTable(userId);
-  await tursoExec(client, `DELETE FROM ${table} WHERE id = ?`, [itemId]);
+  await tursoExec(client, `DELETE FROM items WHERE id = ? AND user_id = ?`, [itemId, userId]);
 }
 
 async function loadItems(client, userId, categoryId = null) {
-  const table = itemsTable(userId);
   const rows = categoryId
-    ? await tursoSelect(client, `SELECT * FROM ${table} WHERE category_id = ?`, [categoryId])
-    : await tursoSelect(client, `SELECT * FROM ${table}`, []);
+    ? await tursoSelect(client, `SELECT * FROM items WHERE user_id = ? AND category_id = ?`, [userId, categoryId])
+    : await tursoSelect(client, `SELECT * FROM items WHERE user_id = ?`, [userId]);
   return rows.map(r => ({
     id: r.id,
     categoryId: r.category_id,
