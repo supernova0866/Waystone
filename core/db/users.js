@@ -1,11 +1,10 @@
 import crypto from 'node:crypto';
 import argon2 from 'argon2';
 import { tursoExec, tursoSelect } from './turso-client.js';
-import { ensureUserTables } from './schema.js';
 
 const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-function generateRandomCode(length = 6) {
+function generateRandomCode(length = 8) {
   let code = '';
   const bytes = crypto.randomBytes(length);
   for (let i = 0; i < length; i++) code += CODE_CHARS[bytes[i] % CODE_CHARS.length];
@@ -30,8 +29,8 @@ async function createInvite(client, { customCode = null } = {}) {
   let code = customCode ? normalizeCode(customCode) : generateRandomCode();
 
   if (customCode) {
-    if (!/^[A-Z0-9]{4,32}$/.test(code)) {
-      throw new Error('Custom code must be 4-32 uppercase letters/numbers');
+    if (!/^[A-Z0-9]{8,32}$/.test(code)) {
+      throw new Error('Custom code must be 8-32 uppercase letters/numbers');
     }
     const existing = await tursoSelect(client, `SELECT id FROM waystone_users WHERE invite_code = ?`, [code]);
     if (existing.length) throw new Error('That code is already in use');
@@ -40,12 +39,10 @@ async function createInvite(client, { customCode = null } = {}) {
   const now = new Date().toISOString();
   await tursoExec(
     client,
-    `INSERT INTO waystone_users (id, username, password_hash, pbkdf2_salt, role, status, invite_code, invite_used, created_at)
-     VALUES (?, NULL, NULL, ?, 'member', 'pending', ?, 0, ?)`,
+    `INSERT INTO waystone_users (id, username, password_hash, pbkdf2_salt, role, status, invite_code, invite_used, session_version, created_at)
+     VALUES (?, NULL, NULL, ?, 'member', 'pending', ?, 0, 0, ?)`,
     [id, salt, code, now]
   );
-
-  await ensureUserTables(client, id);
 
   return { id, code };
 }
@@ -55,7 +52,7 @@ async function findByInviteCode(client, code) {
   return rows[0] || null;
 }
 
-async function acceptInvite(client, { code, username, password }) {
+async function acceptInvite(client, { code, username, authProof }) {
   const user = await findByInviteCode(client, code);
   if (!user) throw new Error('Invalid invite code');
   if (Number(user.invite_used) === 1) throw new Error('This invite code has already been used');
@@ -63,7 +60,7 @@ async function acceptInvite(client, { code, username, password }) {
   const existingUsername = await tursoSelect(client, `SELECT id FROM waystone_users WHERE username = ?`, [username]);
   if (existingUsername.length) throw new Error('That username is taken');
 
-  const passwordHash = await argon2.hash(password, {
+  const passwordHash = await argon2.hash(authProof, {
     type: argon2.argon2id,
     memoryCost: 131072,
     timeCost: 3,
@@ -91,16 +88,33 @@ async function findById(client, userId) {
   return rows[0] || null;
 }
 
-async function verifyLogin(client, username, password) {
+async function verifyLogin(client, username, authProof) {
   const user = await findByUsername(client, username);
   if (!user || user.status !== 'active' || !user.password_hash) return null;
 
-  const ok = await argon2.verify(user.password_hash, password).catch(() => false);
+  const ok = await argon2.verify(user.password_hash, authProof).catch(() => false);
   if (!ok) return null;
 
   await tursoExec(client, `UPDATE waystone_users SET last_login_at = ? WHERE id = ?`, [new Date().toISOString(), user.id]);
 
-  return { id: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt };
+  return { id: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, sessionVersion: Number(user.session_version) || 0 };
+}
+
+// Salts aren't secret — they only need to be unique — so it's safe to hand
+// one back before the user has proven who they are; the client needs it to
+// derive the same authProof the server will check. For a username that
+// doesn't exist, a deterministic dummy salt keeps the response shape
+// identical either way instead of leaking which usernames are registered.
+async function getAuthSalt(client, username) {
+  const user = await findByUsername(client, username);
+  if (user) return user.pbkdf2_salt;
+
+  const secret = process.env.SESSION_SECRET || '';
+  return crypto.createHmac('sha256', secret).update(username).digest('base64').slice(0, 24);
+}
+
+async function bumpSessionVersion(client, userId) {
+  await tursoExec(client, `UPDATE waystone_users SET session_version = session_version + 1 WHERE id = ?`, [userId]);
 }
 
 async function listUsers(client) {
@@ -108,20 +122,18 @@ async function listUsers(client) {
   return rows;
 }
 
-async function seedAdminIfMissing(client, adminUsername, adminPasswordHash) {
+async function seedAdminIfMissing(client, adminUsername, adminPasswordHash, adminSalt) {
   const existing = await tursoSelect(client, `SELECT id FROM waystone_users WHERE role = 'admin'`, []);
   if (existing.length) return null;
 
   const id = generateUserId();
-  const salt = generateSalt();
   const now = new Date().toISOString();
   await tursoExec(
     client,
-    `INSERT INTO waystone_users (id, username, password_hash, pbkdf2_salt, role, status, invite_code, invite_used, created_at, accepted_at)
-     VALUES (?, ?, ?, ?, 'admin', 'active', ?, 1, ?, ?)`,
-    [id, adminUsername, adminPasswordHash, salt, generateRandomCode(10), now, now]
+    `INSERT INTO waystone_users (id, username, password_hash, pbkdf2_salt, role, status, invite_code, invite_used, session_version, created_at, accepted_at)
+     VALUES (?, ?, ?, ?, 'admin', 'active', ?, 1, 0, ?, ?)`,
+    [id, adminUsername, adminPasswordHash, adminSalt, generateRandomCode(10), now, now]
   );
-  await ensureUserTables(client, id);
   return { id, username: adminUsername };
 }
 
@@ -132,6 +144,8 @@ export {
   findByUsername,
   findById,
   verifyLogin,
+  getAuthSalt,
+  bumpSessionVersion,
   listUsers,
   seedAdminIfMissing,
   generateRandomCode,
