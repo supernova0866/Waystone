@@ -348,11 +348,16 @@ function createItemCard(item, category, data, callbacks = {}) {
     </div>
     <span class="item-card-badges">
       ${typeBadge ? `<span class="badge ${typeBadge.cls}">${typeBadge.label}</span>` : ''}
-      <span class="badge">${category?.name || ''}</span>
     </span>
   `;
   head.querySelector('.item-card-title').textContent = data.title || 'Untitled';
   head.querySelector('.item-card-sub').textContent = data.subtitle || '';
+
+  const categoryBadge = document.createElement('span');
+  categoryBadge.className = 'badge';
+  categoryBadge.textContent = category?.name || '';
+  head.querySelector('.item-card-badges').appendChild(categoryBadge);
+
   card.appendChild(head);
 
   if (featured) {
