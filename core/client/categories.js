@@ -4,10 +4,11 @@ function renderSidebarList(container, categories, activeId, onSelect) {
     const el = document.createElement('div');
     el.className = 'tab-item' + (cat.id === activeId ? ' active' : '');
     el.innerHTML = `
-      <span class="tab-icon">${cat.icon || '📁'}</span>
+      <span class="tab-icon"></span>
       <span class="tab-label"></span>
       <span class="tab-count"></span>
     `;
+    el.querySelector('.tab-icon').textContent = cat.icon || '📁';
     el.querySelector('.tab-label').textContent = cat.name;
     el.querySelector('.tab-count').textContent = cat.itemCount ?? '';
     el.addEventListener('click', () => onSelect(cat.id));
