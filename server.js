@@ -4,16 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getClient } from './core/db/turso-client.js';
-import { ensureUsersTable } from './core/db/schema.js';
+import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable } from './core/db/schema.js';
 import { createCategory, saveCategory, deleteCategory, loadCategories } from './core/db/categories.js';
 import { createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
-import { createSessionCookie, getSessionUserId } from './core/auth/session.js';
+import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
+import { checkRateLimit } from './core/auth/rate-limit.js';
 import {
   createInvite,
   findByInviteCode,
   acceptInvite,
   verifyLogin,
   findById,
+  getAuthSalt,
+  bumpSessionVersion,
   listUsers,
   seedAdminIfMissing,
 } from './core/db/users.js';
@@ -53,6 +56,12 @@ function redirect(res, location) {
   res.end();
 }
 
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket.remoteAddress;
+}
+
 async function readJsonBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -61,8 +70,8 @@ async function readJsonBody(req) {
   return JSON.parse(raw);
 }
 
-function setSessionCookie(res, userId) {
-  const value = createSessionCookie(userId);
+function setSessionCookie(res, userId, sessionVersion) {
+  const value = createSessionCookie(userId, sessionVersion);
   res.setHeader('Set-Cookie', [
     `waystone_session=${value}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${60 * 60 * 24 * 14}`,
   ]);
@@ -89,48 +98,68 @@ function isSafeStaticPath(reqPath) {
 }
 
 async function requireUser(req, res) {
-  const userId = getSessionUserId(req);
-  if (!userId) {
+  const info = getSessionInfo(req);
+  if (!info) {
     sendJson(res, 401, { error: 'Not authenticated' });
     return null;
   }
-  return userId;
+  const user = await findById(getClient(), info.userId);
+  if (!user || user.status !== 'active' || Number(user.session_version) !== info.sessionVersion) {
+    sendJson(res, 401, { error: 'Not authenticated' });
+    return null;
+  }
+  return user;
 }
 
 async function requireAdmin(req, res) {
-  const userId = await requireUser(req, res);
-  if (!userId) return null;
-  const user = await findById(getClient(), userId);
-  if (!user || user.role !== 'admin') {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  if (user.role !== 'admin') {
     sendJson(res, 403, { error: 'Admin only' });
     return null;
   }
-  return userId;
+  return user;
 }
 
 async function handleLogin(req, res) {
-  const { username, password } = await readJsonBody(req);
-  if (!username || !password) return sendJson(res, 400, { error: 'Missing username or password' });
+  const { username, authProof } = await readJsonBody(req);
+  if (!username || !authProof) return sendJson(res, 400, { error: 'Missing username or password' });
+
+  if (!checkRateLimit(`login:${getClientIp(req)}`, { max: 10, windowMs: 15 * 60 * 1000 })) {
+    return sendJson(res, 429, { error: 'Too many attempts — try again later' });
+  }
 
   const client = getClient();
-  const user = await verifyLogin(client, username, password);
+  const user = await verifyLogin(client, username, authProof);
   if (!user) return sendJson(res, 401, { error: 'Incorrect username or password' });
 
-  setSessionCookie(res, user.id);
+  setSessionCookie(res, user.id, user.sessionVersion);
   sendJson(res, 200, { ok: true, userId: user.id, username: user.username, role: user.role, salt: user.salt });
 }
 
-function handleLogout(req, res) {
+async function handleLogout(req, res) {
+  const info = getSessionInfo(req);
+  if (info) {
+    await bumpSessionVersion(getClient(), info.userId).catch(() => {});
+  }
   clearSessionCookie(res);
   sendJson(res, 200, { ok: true });
 }
 
 async function handleSessionCheck(req, res) {
-  const userId = getSessionUserId(req);
-  if (!userId) return sendJson(res, 200, { authenticated: false });
-  const user = await findById(getClient(), userId);
-  if (!user) return sendJson(res, 200, { authenticated: false });
+  const info = getSessionInfo(req);
+  if (!info) return sendJson(res, 200, { authenticated: false });
+  const user = await findById(getClient(), info.userId);
+  if (!user || Number(user.session_version) !== info.sessionVersion) return sendJson(res, 200, { authenticated: false });
   sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt });
+}
+
+async function handleAuthSalt(req, res, username) {
+  if (!checkRateLimit(`auth-salt:${getClientIp(req)}`, { max: 20, windowMs: 15 * 60 * 1000 })) {
+    return sendJson(res, 429, { error: 'Too many attempts — try again later' });
+  }
+  const salt = await getAuthSalt(getClient(), username);
+  sendJson(res, 200, { salt });
 }
 
 async function handleInviteCheck(req, res, code) {
@@ -138,17 +167,20 @@ async function handleInviteCheck(req, res, code) {
   const user = await findByInviteCode(client, code);
   if (!user) return sendJson(res, 404, { error: 'Invalid invite code' });
   if (Number(user.invite_used) === 1) return sendJson(res, 410, { error: 'This invite code has already been used' });
-  sendJson(res, 200, { valid: true });
+  sendJson(res, 200, { valid: true, salt: user.pbkdf2_salt });
 }
 
 async function handleAcceptInvite(req, res) {
-  const { code, username, password } = await readJsonBody(req);
-  if (!code || !username || !password) return sendJson(res, 400, { error: 'Missing fields' });
-  if (password.length < 8) return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
+  const { code, username, authProof } = await readJsonBody(req);
+  if (!code || !username || !authProof) return sendJson(res, 400, { error: 'Missing fields' });
+
+  if (!checkRateLimit(`accept-invite:${getClientIp(req)}`, { max: 10, windowMs: 15 * 60 * 1000 })) {
+    return sendJson(res, 429, { error: 'Too many attempts — try again later' });
+  }
 
   const client = getClient();
   try {
-    const result = await acceptInvite(client, { code, username, password });
+    const result = await acceptInvite(client, { code, username, authProof });
     sendJson(res, 200, { ok: true, username: result.username });
   } catch (e) {
     sendJson(res, 400, { error: e.message });
@@ -156,8 +188,8 @@ async function handleAcceptInvite(req, res) {
 }
 
 async function handleCreateInvite(req, res) {
-  const userId = await requireAdmin(req, res);
-  if (!userId) return;
+  const user = await requireAdmin(req, res);
+  if (!user) return;
   const { customCode } = await readJsonBody(req);
   try {
     const result = await createInvite(getClient(), { customCode });
@@ -168,14 +200,15 @@ async function handleCreateInvite(req, res) {
 }
 
 async function handleListUsers(req, res) {
-  const userId = await requireAdmin(req, res);
-  if (!userId) return;
+  const user = await requireAdmin(req, res);
+  if (!user) return;
   sendJson(res, 200, await listUsers(getClient()));
 }
 
 async function handleCategories(req, res, url) {
-  const userId = await requireUser(req, res);
-  if (!userId) return;
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const userId = user.id;
   const client = getClient();
 
   if (req.method === 'GET') return sendJson(res, 200, await loadCategories(client, userId));
@@ -191,8 +224,9 @@ async function handleCategories(req, res, url) {
 }
 
 async function handleItems(req, res, url) {
-  const userId = await requireUser(req, res);
-  if (!userId) return;
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const userId = user.id;
   const client = getClient();
 
   if (req.method === 'GET') return sendJson(res, 200, await loadItems(client, userId, url.searchParams.get('categoryId')));
@@ -208,30 +242,28 @@ async function handleItems(req, res, url) {
 }
 
 async function handleChangePassword(req, res) {
-  const userId = await requireUser(req, res);
-  if (!userId) return;
-  const { oldPassword, newPassword } = await readJsonBody(req);
-  if (!oldPassword || !newPassword) return sendJson(res, 400, { error: 'Missing fields' });
-  if (newPassword.length < 8) return sendJson(res, 400, { error: 'New password must be at least 8 characters' });
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const { oldAuthProof, newAuthProof } = await readJsonBody(req);
+  if (!oldAuthProof || !newAuthProof) return sendJson(res, 400, { error: 'Missing fields' });
 
   const client = getClient();
-  const user = await findById(client, userId);
-  if (!user) return sendJson(res, 404, { error: 'User not found' });
-
   const argon2 = (await import('argon2')).default;
-  const ok = await argon2.verify(user.password_hash, oldPassword).catch(() => false);
+  const ok = await argon2.verify(user.password_hash, oldAuthProof).catch(() => false);
   if (!ok) return sendJson(res, 401, { error: 'Incorrect current password' });
 
-  const newHash = await argon2.hash(newPassword, {
+  const newHash = await argon2.hash(newAuthProof, {
     type: argon2.argon2id,
     memoryCost: 131072,
     timeCost: 3,
     parallelism: 1,
   });
 
+  const newSessionVersion = Number(user.session_version || 0) + 1;
   const { tursoExec } = await import('./core/db/turso-client.js');
-  await tursoExec(client, `UPDATE waystone_users SET password_hash = ? WHERE id = ?`, [newHash, userId]);
+  await tursoExec(client, `UPDATE waystone_users SET password_hash = ?, session_version = ? WHERE id = ?`, [newHash, newSessionVersion, user.id]);
 
+  setSessionCookie(res, user.id, newSessionVersion);
   sendJson(res, 200, { ok: true, salt: user.pbkdf2_salt });
 }
 
@@ -241,8 +273,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (pathname === '/api/login' && req.method === 'POST') return await handleLogin(req, res);
-    if (pathname === '/api/logout' && req.method === 'POST') return handleLogout(req, res);
+    if (pathname === '/api/logout' && req.method === 'POST') return await handleLogout(req, res);
     if (pathname === '/api/session' && req.method === 'GET') return await handleSessionCheck(req, res);
+    if (pathname.startsWith('/api/auth-salt/') && req.method === 'GET') {
+      return await handleAuthSalt(req, res, decodeURIComponent(pathname.slice('/api/auth-salt/'.length)));
+    }
     if (pathname.startsWith('/api/invite/') && req.method === 'GET') {
       return await handleInviteCheck(req, res, decodeURIComponent(pathname.slice('/api/invite/'.length)));
     }
@@ -296,11 +331,14 @@ const server = http.createServer(async (req, res) => {
 
 async function boot() {
   try {
-    await ensureUsersTable(getClient());
-    console.log('waystone_users ready.');
+    const client = getClient();
+    await ensureUsersTable(client);
+    await ensureCategoriesTable(client);
+    await ensureItemsTable(client);
+    console.log('Tables ready.');
 
-    if (process.env.SEED_ADMIN_USERNAME && process.env.SEED_ADMIN_PASSWORD_HASH) {
-      const created = await seedAdminIfMissing(getClient(), process.env.SEED_ADMIN_USERNAME, process.env.SEED_ADMIN_PASSWORD_HASH);
+    if (process.env.SEED_ADMIN_USERNAME && process.env.SEED_ADMIN_PASSWORD_HASH && process.env.SEED_ADMIN_SALT) {
+      const created = await seedAdminIfMissing(client, process.env.SEED_ADMIN_USERNAME, process.env.SEED_ADMIN_PASSWORD_HASH, process.env.SEED_ADMIN_SALT);
       if (created) console.log('Seeded admin user:', created.username);
     }
   } catch (e) {
