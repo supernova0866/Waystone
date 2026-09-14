@@ -9,9 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "generate-hash": "node scripts/generate-hash.js",
-    "validate-themes": "node scripts/validate-themes.cjs",
-    "migrate-tables": "node scripts/migrate-to-universal-tables.js",
-    "rehash-account": "node scripts/rehash-account.js"
+    "validate-themes": "node scripts/validate-themes.cjs"
   },
   "dependencies": {
     "argon2": "^0.41.1"
