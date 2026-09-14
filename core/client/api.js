@@ -18,8 +18,8 @@ async function request(path, options = {}) {
   return body;
 }
 
-async function login(username, password) {
-  return request('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+async function login(username, authProof) {
+  return request('/api/login', { method: 'POST', body: JSON.stringify({ username, authProof }) });
 }
 
 async function logout() {
@@ -30,12 +30,16 @@ async function checkSession() {
   return request('/api/session', { method: 'GET' });
 }
 
+async function getAuthSalt(username) {
+  return request(`/api/auth-salt/${encodeURIComponent(username)}`, { method: 'GET' });
+}
+
 async function checkInviteCode(code) {
   return request(`/api/invite/${encodeURIComponent(code)}`, { method: 'GET' });
 }
 
-async function acceptInvite(code, username, password) {
-  return request('/api/accept-invite', { method: 'POST', body: JSON.stringify({ code, username, password }) });
+async function acceptInvite(code, username, authProof) {
+  return request('/api/accept-invite', { method: 'POST', body: JSON.stringify({ code, username, authProof }) });
 }
 
 async function createInvite(customCode = null) {
@@ -46,8 +50,8 @@ async function listUsers() {
   return request('/api/users', { method: 'GET' });
 }
 
-async function changePassword(oldPassword, newPassword) {
-  return request('/api/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) });
+async function changePassword(oldAuthProof, newAuthProof) {
+  return request('/api/change-password', { method: 'POST', body: JSON.stringify({ oldAuthProof, newAuthProof }) });
 }
 
 async function fetchCategories() {
@@ -87,6 +91,7 @@ export {
   login,
   logout,
   checkSession,
+  getAuthSalt,
   checkInviteCode,
   acceptInvite,
   createInvite,
