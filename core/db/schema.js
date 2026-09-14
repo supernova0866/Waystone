@@ -1,21 +1,5 @@
 import { tursoQuery } from './turso-client.js';
 
-const SAFE_ID = /^[a-z0-9]{8,40}$/;
-
-function assertSafeId(id) {
-  if (!SAFE_ID.test(id)) throw new Error('Unsafe user id for table name: ' + id);
-}
-
-function categoriesTable(userId) {
-  assertSafeId(userId);
-  return `categories_${userId}`;
-}
-
-function itemsTable(userId) {
-  assertSafeId(userId);
-  return `items_${userId}`;
-}
-
 async function ensureUsersTable(client) {
   const { error } = await tursoQuery(client.url, client.token,
     `CREATE TABLE IF NOT EXISTS waystone_users (
@@ -27,6 +11,7 @@ async function ensureUsersTable(client) {
        status TEXT DEFAULT 'pending',
        invite_code TEXT UNIQUE NOT NULL,
        invite_used INTEGER DEFAULT 0,
+       session_version INTEGER DEFAULT 0,
        created_at TEXT,
        accepted_at TEXT,
        last_login_at TEXT
@@ -34,23 +19,17 @@ async function ensureUsersTable(client) {
   if (error) throw new Error(error);
 }
 
-async function ensureUserTables(client, userId) {
+async function ensureCategoriesTable(client) {
   const sqls = [
-    `CREATE TABLE IF NOT EXISTS ${categoriesTable(userId)} (
+    `CREATE TABLE IF NOT EXISTS categories (
        id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
        name TEXT NOT NULL,
        icon TEXT DEFAULT '',
        sort_order INTEGER DEFAULT 0,
        fields TEXT DEFAULT '[]'
      )`,
-    `CREATE TABLE IF NOT EXISTS ${itemsTable(userId)} (
-       id TEXT PRIMARY KEY,
-       category_id TEXT,
-       data_enc TEXT NOT NULL,
-       iv TEXT NOT NULL,
-       created_at TEXT,
-       updated_at TEXT
-     )`,
+    `CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id)`,
   ];
   for (const sql of sqls) {
     const { error } = await tursoQuery(client.url, client.token, sql, []);
@@ -58,4 +37,23 @@ async function ensureUserTables(client, userId) {
   }
 }
 
-export { ensureUsersTable, ensureUserTables, categoriesTable, itemsTable, assertSafeId };
+async function ensureItemsTable(client) {
+  const sqls = [
+    `CREATE TABLE IF NOT EXISTS items (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       category_id TEXT,
+       data_enc TEXT NOT NULL,
+       iv TEXT NOT NULL,
+       created_at TEXT,
+       updated_at TEXT
+     )`,
+    `CREATE INDEX IF NOT EXISTS idx_items_user_category ON items(user_id, category_id)`,
+  ];
+  for (const sql of sqls) {
+    const { error } = await tursoQuery(client.url, client.token, sql, []);
+    if (error) throw new Error(error);
+  }
+}
+
+export { ensureUsersTable, ensureCategoriesTable, ensureItemsTable };
