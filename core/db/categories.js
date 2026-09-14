@@ -1,41 +1,37 @@
 import { tursoExec, tursoSelect } from './turso-client.js';
-import { categoriesTable, itemsTable } from './schema.js';
 
 async function createCategory(client, userId, category) {
-  const table = categoriesTable(userId);
   await tursoExec(
     client,
-    `INSERT INTO ${table} (id, name, icon, sort_order, fields) VALUES (?, ?, ?, ?, ?)`,
-    [category.id, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || [])]
+    `INSERT INTO categories (id, user_id, name, icon, sort_order, fields) VALUES (?, ?, ?, ?, ?, ?)`,
+    [category.id, userId, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || [])]
   );
   return { ...category, itemCount: 0 };
 }
 
 async function saveCategory(client, userId, category) {
-  const table = categoriesTable(userId);
   await tursoExec(
     client,
-    `INSERT INTO ${table} (id, name, icon, sort_order, fields)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO categories (id, user_id, name, icon, sort_order, fields)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name       = excluded.name,
        icon       = excluded.icon,
        sort_order = excluded.sort_order,
-       fields     = excluded.fields`,
-    [category.id, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || [])]
+       fields     = excluded.fields
+     WHERE categories.user_id = ?`,
+    [category.id, userId, category.name, category.icon || '', category.sortOrder || 0, JSON.stringify(category.fields || []), userId]
   );
   return category;
 }
 
 async function deleteCategory(client, userId, categoryId) {
-  const catTable = categoriesTable(userId);
-  await tursoExec(client, `DELETE FROM ${itemsTable(userId)} WHERE category_id = ?`, [categoryId]);
-  await tursoExec(client, `DELETE FROM ${catTable} WHERE id = ?`, [categoryId]);
+  await tursoExec(client, `DELETE FROM items WHERE category_id = ? AND user_id = ?`, [categoryId, userId]);
+  await tursoExec(client, `DELETE FROM categories WHERE id = ? AND user_id = ?`, [categoryId, userId]);
 }
 
 async function loadCategories(client, userId) {
-  const table = categoriesTable(userId);
-  const rows = await tursoSelect(client, `SELECT * FROM ${table} ORDER BY sort_order ASC`, []);
+  const rows = await tursoSelect(client, `SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order ASC`, [userId]);
 
   // One grouped query for every category's item count, rather than N queries
   // (or the sidebar just never showing counts, which is what was happening).
@@ -45,8 +41,8 @@ async function loadCategories(client, userId) {
   try {
     const countRows = await tursoSelect(
       client,
-      `SELECT category_id, COUNT(*) as cnt FROM ${itemsTable(userId)} GROUP BY category_id`,
-      []
+      `SELECT category_id, COUNT(*) as cnt FROM items WHERE user_id = ? GROUP BY category_id`,
+      [userId]
     );
     counts = Object.fromEntries(countRows.map(r => [r.category_id, Number(r.cnt) || 0]));
   } catch (e) {
