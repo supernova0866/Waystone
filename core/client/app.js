@@ -1,5 +1,5 @@
-import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword } from '/core/client/api.js';
-import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData } from '/core/client/crypto.js';
+import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
+import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
 import { renderSidebarList, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
 import { buildIsel } from '/core/client/isel.js';
@@ -816,6 +816,11 @@ function wireSettingsSecurity() {
     errorEl.style.display = 'none';
     successEl.style.display = 'none';
     if (!oldPassword || !newPassword) return;
+    if (newPassword.length < 8) {
+      errorEl.textContent = 'New password must be at least 8 characters.';
+      errorEl.style.display = 'block';
+      return;
+    }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Re-encrypting…';
@@ -828,7 +833,10 @@ function wireSettingsSecurity() {
         decrypted.push({ item, data: await decryptItemData(item) });
       }
 
-      const result = await changePassword(oldPassword, newPassword);
+      const session = await checkSession();
+      const oldAuthProof = await deriveAuthProof(oldPassword, session.salt);
+      const newAuthProof = await deriveAuthProof(newPassword, session.salt);
+      const result = await changePassword(oldAuthProof, newAuthProof);
       await unlockVault(newPassword, result.salt);
 
       for (const { item, data } of decrypted) {
@@ -911,15 +919,24 @@ async function wireSettingsAdmin() {
   async function refreshUsers() {
     const users = await listUsers();
     const tbody = document.getElementById('settings-users-tbody');
-    tbody.innerHTML = users.map(u => `
-      <tr>
-        <td>${u.username || '(pending)'}</td>
-        <td>${u.role}</td>
-        <td>${u.status}</td>
-        <td class="mono">${u.invite_code}${Number(u.invite_used) ? ' (used)' : ''}</td>
-        <td>${u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—'}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = '';
+    for (const u of users) {
+      const tr = document.createElement('tr');
+      const cells = [
+        u.username || '(pending)',
+        u.role,
+        u.status,
+        `${u.invite_code}${Number(u.invite_used) ? ' (used)' : ''}`,
+        u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—',
+      ];
+      cells.forEach((text, i) => {
+        const td = document.createElement('td');
+        if (i === 3) td.className = 'mono';
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
   }
 
   document.getElementById('settings-custom-code-toggle').addEventListener('change', (e) => {
@@ -1098,7 +1115,9 @@ el.loginForm.addEventListener('submit', async (e) => {
   const originalText = el.loginSubmit.textContent;
   const stopLoading = startButtonLoading(el.loginSubmit, 'Logging in');
   try {
-    const result = await login(username, password);
+    const { salt } = await getAuthSalt(username);
+    const authProof = await deriveAuthProof(password, salt);
+    const result = await login(username, authProof);
     await unlockVault(password, result.salt);
     state.username = result.username;
     state.role = result.role;
