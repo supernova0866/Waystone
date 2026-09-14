@@ -17,6 +17,12 @@ async function ensureUsersTable(client) {
        last_login_at TEXT
      )`, []);
   if (error) throw new Error(error);
+
+  // CREATE TABLE IF NOT EXISTS is a no-op on a table that already existed
+  // before session_version was added, so it never gets the column. This
+  // adds it if missing and is silently ignored if it's already there.
+  await tursoQuery(client.url, client.token,
+    `ALTER TABLE waystone_users ADD COLUMN session_version INTEGER DEFAULT 0`, []);
 }
 
 async function ensureCategoriesTable(client) {
