@@ -15,16 +15,16 @@ function base64ToBytes(b64) {
   return bytes;
 }
 
-async function unlockVault(masterPassword, saltBase64) {
+async function deriveMasterBits(masterPassword, saltBase64) {
   const passwordKey = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(masterPassword),
     'PBKDF2',
     false,
-    ['deriveKey']
+    ['deriveBits']
   );
 
-  unlockedKey = await crypto.subtle.deriveKey(
+  return crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
       salt: base64ToBytes(saltBase64),
@@ -32,12 +32,43 @@ async function unlockVault(masterPassword, saltBase64) {
       hash: 'SHA-256',
     },
     passwordKey,
+    256
+  );
+}
+
+// unlockVault uses the raw PBKDF2 output directly as the vault key — same
+// as the original app, so existing encrypted items keep decrypting under
+// the same password. deriveAuthProof runs that same output through one
+// extra HKDF step before it's sent to the server: HKDF is one-way, so the
+// server can't work backward from the auth proof to the vault key.
+async function unlockVault(masterPassword, saltBase64) {
+  const masterBits = await deriveMasterBits(masterPassword, saltBase64);
+
+  unlockedKey = await crypto.subtle.importKey(
+    'raw',
+    masterBits,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt']
   );
 
   return true;
+}
+
+async function deriveAuthProof(masterPassword, saltBase64) {
+  const masterBits = await deriveMasterBits(masterPassword, saltBase64);
+  const hkdfKey = await crypto.subtle.importKey('raw', masterBits, 'HKDF', false, ['deriveBits']);
+  const authBits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: base64ToBytes(saltBase64),
+      info: new TextEncoder().encode('waystone-auth-v1'),
+    },
+    hkdfKey,
+    256
+  );
+  return bytesToBase64(new Uint8Array(authBits));
 }
 
 function lockVault() {
@@ -78,4 +109,4 @@ async function decryptItemData({ dataEnc, iv }) {
   return JSON.parse(new TextDecoder().decode(plaintextBuf));
 }
 
-export { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData };
+export { unlockVault, deriveAuthProof, lockVault, isUnlocked, encryptItemData, decryptItemData };
