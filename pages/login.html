@@ -72,11 +72,13 @@
 
 <script type="module">
 import { checkInviteCode, acceptInvite } from '/core/client/api.js';
+import { deriveAuthProof } from '/core/client/crypto.js';
 import { initParticles } from '/core/client/particles.js';
 
 initParticles();
 
 let validatedCode = null;
+let validatedSalt = null;
 
 const codeForm = document.getElementById('code-form');
 const codeInput = document.getElementById('invite-code');
@@ -113,8 +115,9 @@ codeForm.addEventListener('submit', async (e) => {
   codeSubmit.textContent = 'Checking…';
 
   try {
-    await checkInviteCode(code);
+    const result = await checkInviteCode(code);
     validatedCode = code;
+    validatedSalt = result.salt;
     codeForm.style.display = 'none';
     accountForm.style.display = 'flex';
     usernameInput.focus();
@@ -131,13 +134,18 @@ accountForm.addEventListener('submit', async (e) => {
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
   if (!username || !password) return;
+  if (password.length < 8) {
+    accountError.textContent = 'Use at least 8 characters.';
+    return;
+  }
 
   accountError.textContent = '';
   accountSubmit.disabled = true;
   accountSubmit.textContent = 'Creating…';
 
   try {
-    await acceptInvite(validatedCode, username, password);
+    const authProof = await deriveAuthProof(password, validatedSalt);
+    await acceptInvite(validatedCode, username, authProof);
     accountForm.style.display = 'none';
     successBlock.style.display = 'block';
   } catch (err) {
