@@ -8,9 +8,9 @@ function sign(value) {
   return crypto.createHmac('sha256', secret).update(value).digest('hex');
 }
 
-function createSessionCookie(userId) {
+function createSessionCookie(userId, sessionVersion) {
   const issuedAt = Date.now().toString();
-  const payload = `${userId}.${issuedAt}`;
+  const payload = `${userId}.${issuedAt}.${sessionVersion}`;
   const signature = sign(payload);
   return `${payload}.${signature}`;
 }
@@ -18,11 +18,11 @@ function createSessionCookie(userId) {
 function verifySessionCookie(cookieValue) {
   if (!cookieValue) return null;
   const parts = cookieValue.split('.');
-  if (parts.length !== 3) return null;
-  const [userId, issuedAt, signature] = parts;
-  if (!userId || !issuedAt || !signature) return null;
+  if (parts.length !== 4) return null;
+  const [userId, issuedAt, sessionVersion, signature] = parts;
+  if (!userId || !issuedAt || !sessionVersion || !signature) return null;
 
-  const expected = sign(`${userId}.${issuedAt}`);
+  const expected = sign(`${userId}.${issuedAt}.${sessionVersion}`);
   const sigBuf = Buffer.from(signature, 'hex');
   const expBuf = Buffer.from(expected, 'hex');
   if (sigBuf.length !== expBuf.length) return null;
@@ -31,7 +31,7 @@ function verifySessionCookie(cookieValue) {
   const age = Date.now() - Number(issuedAt);
   if (Number.isNaN(age) || age < 0 || age > SESSION_MAX_AGE_MS) return null;
 
-  return userId;
+  return { userId, sessionVersion: Number(sessionVersion) };
 }
 
 function parseCookies(cookieHeader = '') {
@@ -46,9 +46,9 @@ function parseCookies(cookieHeader = '') {
   return out;
 }
 
-function getSessionUserId(req) {
+function getSessionInfo(req) {
   const cookies = parseCookies(req.headers.cookie || '');
   return verifySessionCookie(cookies.waystone_session);
 }
 
-export { createSessionCookie, verifySessionCookie, parseCookies, getSessionUserId };
+export { createSessionCookie, verifySessionCookie, parseCookies, getSessionInfo };
