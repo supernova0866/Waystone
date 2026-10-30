@@ -29,6 +29,7 @@ const el = {
   unlockUsernameLabel: document.getElementById('unlock-username-label'),
   unlockPassword: document.getElementById('unlock-password'),
   unlockSubmit: document.getElementById('unlock-submit'),
+  unlockLogout: document.getElementById('unlock-logout'),
 
   app: document.getElementById('app-shell'),
   sidebar: document.getElementById('app-sidebar'),
@@ -178,7 +179,7 @@ async function loadItems() {
 
   const rows = await withSessionGuard(() => fetchItems(categoryId));
   if (rows === null) return;
-  if (state.activeCategoryId !== categoryId) return; // user already switched tabs again
+  if (state.activeCategoryId !== categoryId) return;
 
   if (rows.length === 0) {
     state.items = [];
@@ -196,7 +197,7 @@ async function loadItems() {
     } catch (e) {
       data = { title: '⚠ Could not decrypt', fields: {} };
     }
-    if (state.activeCategoryId !== categoryId) return; // stale — a newer tab is active now
+    if (state.activeCategoryId !== categoryId) return;
     state.items[idx] = { item: row, data };
     swapSkeletonForCard(idx, category, row, data);
   }));
@@ -371,13 +372,6 @@ function closeEditor() {
   el.modalBackdrop.style.display = 'none';
 }
 
-/* ── View modal — read-only, shows every field on the item (not just the
-   truncated top-3 the compact card shows). Reuses renderFieldRow so TOTP
-   still ticks live, backup codes are still copyable/consumable, etc. Any
-   backup code consumed from here also needs the compact card's own hero
-   count refreshed, so on close we just reload the grid if anything changed
-   rather than trying to keep two live renders of the same field in sync. */
-
 let viewModalDisposers = [];
 let viewModalChanged = false;
 
@@ -428,11 +422,6 @@ function closeViewModal() {
 }
 
 el.viewModalClose.addEventListener('click', closeViewModal);
-
-/* ── Schema editor — reachable directly from the topbar, one field-row-per-field,
-   mirrors the compact editor from Settings but scoped to a single category so
-   the flow is "click Edit Schema on the category you're looking at" rather than
-   "navigate to Settings, scroll to find the category, expand it." ────────── */
 
 function openSchemaEditor(category) {
   const working = { ...category, fields: category.fields.map(f => ({ ...f })) };
@@ -600,9 +589,6 @@ function closeSchemaEditor() {
   el.schemaModalBackdrop.style.display = 'none';
 }
 
-/* ── Field reorder context menu — right-click a field row in the schema
-   editor for Move to Top / Move Up / Move Down / Move to Bottom. ───────── */
-
 function moveField(fields, fromIdx, toIdx, rerender) {
   const clamped = Math.max(0, Math.min(toIdx, fields.length - 1));
   if (clamped === fromIdx) return;
@@ -670,13 +656,6 @@ function showFieldContextMenu(e, { atTop, atBottom, onMoveTop, onMoveUp, onMoveD
   menu.style.top = y + 'px';
   menu.style.visibility = 'visible';
 }
-
-/* ── Settings — now a modal instead of a page navigation. Settings used to
-   live at /settings, a full page load; that reset the JS module state,
-   which meant the in-memory unlocked vault key (crypto.js's module-level
-   `unlockedKey`) was gone and you had to re-enter your master password
-   every single time. As a modal, the page never reloads, so the vault
-   stays unlocked and everything below just reuses it directly. ────────── */
 
 async function openSettingsModal() {
   el.settingsModalBody.innerHTML = '';
@@ -825,8 +804,6 @@ function wireSettingsSecurity() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Re-encrypting…';
     try {
-      // Vault's already unlocked with the current password from login/unlock —
-      // decrypt everything with it, then re-derive+re-encrypt with the new one.
       const allItems = await fetchItems();
       const decrypted = [];
       for (const item of allItems) {
@@ -1048,12 +1025,6 @@ function closeCategoryModal() {
 
 el.categoryModalClose.addEventListener('click', closeCategoryModal);
 
-/* ── Sidebar collapse — toggle lives in the topbar, outside the sidebar
-   itself, so it stays reachable even when the sidebar is collapsed (an
-   in-sidebar toggle used to hide itself along with everything else, with
-   nothing short of a refresh able to bring it back). Preference persists
-   across reloads. ──────────────────────────────────────────────────── */
-
 function setSidebarCollapsed(collapsed) {
   el.sidebar?.classList.toggle('collapsed', collapsed);
   try { localStorage.setItem('waystone-sidebar-collapsed', collapsed ? '1' : '0'); } catch (e) {}
@@ -1077,14 +1048,17 @@ el.lockBtn?.addEventListener('click', () => {
   showUnlockGate(state.username || '');
 });
 
-el.logoutBtn?.addEventListener('click', async () => {
+async function performLogout() {
   await logout().catch(() => {});
   lockVault();
   state.username = null;
   state.role = null;
   resetState();
   showLoginGate();
-});
+}
+
+el.logoutBtn?.addEventListener('click', performLogout);
+el.unlockLogout?.addEventListener('click', performLogout);
 
 const LOADING_DOT_CYCLE = ['.', '..', '...', '..', '.', '...', '..'];
 
