@@ -1,0 +1,34 @@
+.home { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 28px; }
+
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  background: color-mix(in srgb, var(--surface) calc(var(--glass-opacity, 1) * 100%), transparent);
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-top: 6px;
+}
+.stat-breakdown { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.stat-breakdown-row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); }
+.stat-breakdown-row span:last-child { font-family: var(--font-mono); color: var(--text); }
+
+.home-section h3 { margin-bottom: 10px; }
