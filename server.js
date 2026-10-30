@@ -149,7 +149,7 @@ async function handleLogin(req, res) {
   if (!user) return sendJson(res, 401, { error: 'Incorrect username or password' });
 
   setSessionCookie(res, user.id, user.sessionVersion);
-  sendJson(res, 200, { ok: true, userId: user.id, username: user.username, role: user.role, salt: user.salt });
+  sendJson(res, 200, { ok: true, userId: user.id, username: user.username, role: user.role, salt: user.salt, loginCount: user.loginCount });
 }
 
 async function handleLogout(req, res) {
@@ -166,7 +166,7 @@ async function handleSessionCheck(req, res) {
   if (!info) return sendJson(res, 200, { authenticated: false });
   const user = await findById(getClient(), info.userId);
   if (!user || Number(user.session_version) !== info.sessionVersion) return sendJson(res, 200, { authenticated: false });
-  sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt });
+  sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, loginCount: Number(user.login_count) || 0 });
 }
 
 async function handleAuthSalt(req, res, username) {
