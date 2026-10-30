@@ -19,7 +19,8 @@ function attachGrip(grip, el, container) {
     if (e.button !== undefined && e.button !== 0) return;
     e.preventDefault();
     const before = currentOrder(container);
-    grip.setPointerCapture(e.pointerId);
+    const pointerId = e.pointerId;
+    container.setPointerCapture(pointerId);
     el.classList.add('dragging');
 
     const onMove = (ev) => {
@@ -31,15 +32,16 @@ function attachGrip(grip, el, container) {
       container.insertBefore(el, next || null);
     };
     const onEnd = () => {
-      grip.removeEventListener('pointermove', onMove);
-      grip.removeEventListener('pointerup', onEnd);
-      grip.removeEventListener('pointercancel', onEnd);
+      container.removeEventListener('pointermove', onMove);
+      container.removeEventListener('pointerup', onEnd);
+      container.removeEventListener('pointercancel', onEnd);
+      if (container.hasPointerCapture(pointerId)) container.releasePointerCapture(pointerId);
       el.classList.remove('dragging');
       emitReorder(container, before);
     };
-    grip.addEventListener('pointermove', onMove);
-    grip.addEventListener('pointerup', onEnd);
-    grip.addEventListener('pointercancel', onEnd);
+    container.addEventListener('pointermove', onMove);
+    container.addEventListener('pointerup', onEnd);
+    container.addEventListener('pointercancel', onEnd);
   });
 }
 
