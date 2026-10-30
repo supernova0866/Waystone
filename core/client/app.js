@@ -2,7 +2,8 @@ import { checkSession, login, logout, fetchCategories, createCategory, saveCateg
 import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
 import { renderSidebarList, setReorderHandler, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
-import { renderPinnedList, renderHomePlaceholder, renderTagsPlaceholder } from '/core/client/views.js';
+import { renderPinnedList, renderHomeView, renderTagsPlaceholder } from '/core/client/views.js';
+import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats } from '/core/client/vault-index.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -10,12 +11,15 @@ import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/c
 const state = {
   username: null,
   role: null,
+  loginCount: 0,
   categories: [],
   view: 'home',
   activeCategoryId: null,
   items: [],
   disposers: [],
 };
+
+let indexRun = 0;
 
 const el = {
   loginGate: document.getElementById('login-gate'),
@@ -77,6 +81,8 @@ function clearItemDisposers() {
 
 function resetState() {
   clearItemDisposers();
+  indexRun++;
+  clearIndex();
   state.categories = [];
   state.view = 'home';
   state.activeCategoryId = null;
@@ -87,6 +93,7 @@ async function showApp() {
   hideAllGates();
   el.app.style.display = '';
   await loadCategories();
+  refreshIndex();
 
   if (window.location.pathname === '/settings') {
     history.replaceState(null, '', '/');
@@ -142,6 +149,32 @@ async function loadCategories() {
   await renderView();
 }
 
+async function loadVaultIndex() {
+  const run = ++indexRun;
+  const rows = await withSessionGuard(() => fetchItems());
+  if (rows === null || run !== indexRun) return;
+
+  const categoryById = new Map(state.categories.map(c => [c.id, c]));
+  const built = await Promise.all(rows.map(async (row) => {
+    const category = categoryById.get(row.categoryId);
+    if (!category) return null;
+    try {
+      return buildEntry(row, await decryptItemData(row), category);
+    } catch (e) {
+      console.error('Skipped undecryptable item', row.id);
+      return null;
+    }
+  }));
+  if (run !== indexRun) return;
+
+  replaceIndex(built.filter(Boolean));
+  if (state.view === 'home') renderHome();
+}
+
+function refreshIndex() {
+  loadVaultIndex().catch(err => console.error('Index load failed:', err.message));
+}
+
 function renderNav() {
   renderPinnedList(el.pinnedList, state.view, selectView);
   renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
@@ -162,7 +195,11 @@ async function renderView() {
 }
 
 function renderHome() {
-  renderHomePlaceholder(el.cardGrid, state.categories);
+  renderHomeView(el.cardGrid, {
+    categories: state.categories,
+    loginCount: state.loginCount,
+    stats: isIndexReady() ? secretStats() : null,
+  });
 }
 
 function renderTags() {
@@ -300,6 +337,8 @@ async function consumeBackupCode(item, data, field, codes) {
   data.fields[field.id] = remaining;
   const enc = await encryptItemData(data);
   await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, ...enc }));
+  const owner = state.categories.find(c => c.id === item.categoryId);
+  if (owner) upsertIndex(buildEntry(item, data, owner));
   return remaining;
 }
 
@@ -381,6 +420,7 @@ function openEditor(item, data) {
   actions.querySelector('#modal-delete')?.addEventListener('click', async () => {
     if (!confirm('Delete this item? This cannot be undone.')) return;
     await withSessionGuard(() => deleteItem(item.id));
+    removeFromIndex(item.id);
     bumpCategoryCount(state.activeCategoryId, -1);
     closeEditor();
     await loadItems();
@@ -391,17 +431,20 @@ function openEditor(item, data) {
     try {
       const fieldValues = Object.fromEntries(Object.entries(getters).map(([id, get]) => [id, get()]));
       const newData = {
+        ...data,
         title: (titleFieldDef && fieldValues[titleFieldDef.id]) || data.title || 'Untitled',
         subtitle: (subtitleFieldDef && fieldValues[subtitleFieldDef.id]) || '',
         fields: fieldValues,
       };
       const enc = await encryptItemData(newData);
+      let saved;
       if (item.id) {
-        await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, ...enc }));
+        saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, ...enc }));
       } else {
-        await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: state.activeCategoryId, ...enc }));
+        saved = await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: state.activeCategoryId, ...enc }));
         bumpCategoryCount(state.activeCategoryId, 1);
       }
+      if (saved) upsertIndex(buildEntry(saved, newData, category));
       closeEditor();
       await loadItems();
     } finally {
@@ -616,6 +659,7 @@ function openSchemaEditor(category) {
     if (!confirm(`Delete "${working.name}" and everything in it? This cannot be undone.`)) return;
     await withSessionGuard(() => deleteCategory(working.id));
     closeSchemaEditor();
+    removeCategoryFromIndex(working.id);
     if (state.activeCategoryId === working.id) state.activeCategoryId = null;
     await loadCategories();
   });
@@ -629,6 +673,7 @@ function openSchemaEditor(category) {
       if (saved === null) return;
       closeSchemaEditor();
       await loadCategories();
+      refreshIndex();
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save Changes';
@@ -927,6 +972,7 @@ function wireSettingsData() {
       }
       alert(`Imported ${imported} item(s). Categories referenced by the file that no longer exist were skipped.`);
       await loadCategories();
+      refreshIndex();
     } catch (err) {
       alert('Import failed: ' + err.message);
     } finally {
@@ -940,6 +986,7 @@ function wireSettingsData() {
       await withSessionGuard(() => deleteCategory(category.id));
     }
     state.activeCategoryId = null;
+    replaceIndex([]);
     await loadCategories();
     alert('All data deleted.');
   });
@@ -1147,6 +1194,7 @@ el.loginForm.addEventListener('submit', async (e) => {
     await unlockVault(password, result.salt);
     state.username = result.username;
     state.role = result.role;
+    state.loginCount = result.loginCount || 0;
     await showApp();
   } catch (err) {
     el.loginError.textContent = 'Incorrect username or password.';
@@ -1168,6 +1216,7 @@ el.unlockForm.addEventListener('submit', async (e) => {
     await unlockVault(password, session.salt);
     state.username = session.username;
     state.role = session.role;
+    state.loginCount = session.loginCount || 0;
     await showApp();
   } catch (err) {
     el.unlockError.textContent = 'Could not unlock with that password.';
@@ -1187,6 +1236,7 @@ async function boot() {
 
   state.username = session.username;
   state.role = session.role;
+  state.loginCount = session.loginCount || 0;
 
   if (isUnlocked()) {
     await showApp();
