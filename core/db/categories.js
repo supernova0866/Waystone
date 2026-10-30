@@ -1,4 +1,4 @@
-import { tursoExec, tursoSelect } from './turso-client.js';
+import { tursoExec, tursoSelect, tursoBatch } from './turso-client.js';
 
 async function createCategory(client, userId, category) {
   await tursoExec(
@@ -25,6 +25,27 @@ async function saveCategory(client, userId, category) {
   return category;
 }
 
+async function reorderCategories(client, userId, orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.some(id => typeof id !== 'string')) {
+    throw new Error('Invalid order');
+  }
+  if (new Set(orderedIds).size !== orderedIds.length) throw new Error('Duplicate ids in order');
+
+  const owned = await tursoSelect(client, `SELECT id FROM categories WHERE user_id = ?`, [userId]);
+  const ownedIds = new Set(owned.map(r => r.id));
+  if (ownedIds.size !== orderedIds.length || orderedIds.some(id => !ownedIds.has(id))) {
+    throw new Error('Order must list every category exactly once');
+  }
+
+  await tursoBatch(
+    client,
+    orderedIds.map((id, i) => ({
+      sql: `UPDATE categories SET sort_order = ? WHERE id = ? AND user_id = ?`,
+      args: [i, id, userId],
+    }))
+  );
+}
+
 async function deleteCategory(client, userId, categoryId) {
   await tursoExec(client, `DELETE FROM items WHERE category_id = ? AND user_id = ?`, [categoryId, userId]);
   await tursoExec(client, `DELETE FROM categories WHERE id = ? AND user_id = ?`, [categoryId, userId]);
@@ -33,10 +54,6 @@ async function deleteCategory(client, userId, categoryId) {
 async function loadCategories(client, userId) {
   const rows = await tursoSelect(client, `SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order ASC`, [userId]);
 
-  // One grouped query for every category's item count, rather than N queries
-  // (or the sidebar just never showing counts, which is what was happening).
-  // Tolerate this failing — a category list with blank counts beats one that
-  // doesn't load at all if the items table is ever in an unexpected state.
   let counts = {};
   try {
     const countRows = await tursoSelect(
@@ -59,4 +76,4 @@ async function loadCategories(client, userId) {
   }));
 }
 
-export { createCategory, saveCategory, deleteCategory, loadCategories };
+export { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories };
