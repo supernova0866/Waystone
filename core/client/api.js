@@ -66,6 +66,10 @@ async function saveCategory(category) {
   return request('/api/categories', { method: 'PUT', body: JSON.stringify(category) });
 }
 
+async function reorderCategories(ids) {
+  return request('/api/categories/order', { method: 'PUT', body: JSON.stringify({ ids }) });
+}
+
 async function deleteCategory(categoryId) {
   return request(`/api/categories?id=${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
 }
@@ -100,6 +104,7 @@ export {
   fetchCategories,
   createCategory,
   saveCategory,
+  reorderCategories,
   deleteCategory,
   fetchItems,
   createItem,
