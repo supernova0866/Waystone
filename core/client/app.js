@@ -2,6 +2,7 @@ import { checkSession, login, logout, fetchCategories, createCategory, saveCateg
 import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
 import { renderSidebarList, setReorderHandler, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
+import { renderPinnedList, renderHomePlaceholder, renderTagsPlaceholder } from '/core/client/views.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -10,6 +11,7 @@ const state = {
   username: null,
   role: null,
   categories: [],
+  view: 'home',
   activeCategoryId: null,
   items: [],
   disposers: [],
@@ -35,6 +37,7 @@ const el = {
   sidebar: document.getElementById('app-sidebar'),
   topbarSidebarToggle: document.getElementById('topbar-sidebar-toggle'),
   sidebarList: document.getElementById('sidebar-list'),
+  pinnedList: document.getElementById('sidebar-pinned'),
   topbarTitle: document.getElementById('topbar-title'),
   cardGrid: document.getElementById('card-grid'),
   addItemBtn: document.getElementById('add-item-btn'),
@@ -75,6 +78,7 @@ function clearItemDisposers() {
 function resetState() {
   clearItemDisposers();
   state.categories = [];
+  state.view = 'home';
   state.activeCategoryId = null;
   state.items = [];
 }
@@ -129,41 +133,67 @@ async function loadCategories() {
   if (result === null) return;
   state.categories = result;
 
-  if (!state.activeCategoryId && state.categories.length) {
-    state.activeCategoryId = state.categories[0].id;
-  }
-  if (state.activeCategoryId && !state.categories.find(c => c.id === state.activeCategoryId)) {
-    state.activeCategoryId = state.categories[0]?.id || null;
+  if (state.activeCategoryId && !state.categories.some(c => c.id === state.activeCategoryId)) {
+    state.activeCategoryId = null;
+    state.view = 'home';
   }
 
+  renderNav();
+  await renderView();
+}
+
+function renderNav() {
+  renderPinnedList(el.pinnedList, state.view, selectView);
   renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
   updateTopbar();
   updateAddItemAvailability();
+}
 
-  if (state.categories.length === 0) {
-    el.cardGrid.innerHTML = '<div class="empty-state"><div class="es-icon">📁</div>No categories yet — create one to get started.</div>';
-    return;
+async function renderView() {
+  clearItemDisposers();
+  if (state.view === 'category' && !activeCategory()) {
+    state.view = 'home';
+    state.activeCategoryId = null;
+    renderNav();
   }
+  if (state.view === 'home') return renderHome();
+  if (state.view === 'tags') return renderTags();
+  await loadItems();
+}
 
-  if (state.activeCategoryId) await loadItems();
+function renderHome() {
+  renderHomePlaceholder(el.cardGrid, state.categories);
+}
+
+function renderTags() {
+  renderTagsPlaceholder(el.cardGrid);
 }
 
 function updateTopbar() {
   const category = activeCategory();
-  el.topbarTitle.textContent = category ? category.name : 'WayStone';
+  if (state.view === 'home') el.topbarTitle.textContent = 'Home';
+  else if (state.view === 'tags') el.topbarTitle.textContent = 'Tags';
+  else el.topbarTitle.textContent = category ? category.name : 'WayStone';
 }
 
 function updateAddItemAvailability() {
-  el.addItemBtn.disabled = !state.activeCategoryId;
-  el.editSchemaBtn.disabled = !state.activeCategoryId;
+  const inCategory = state.view === 'category' && !!state.activeCategoryId;
+  el.addItemBtn.classList.toggle('hidden', !inCategory);
+  el.editSchemaBtn.classList.toggle('hidden', !inCategory);
+}
+
+async function selectView(view) {
+  state.view = view;
+  state.activeCategoryId = null;
+  renderNav();
+  await renderView();
 }
 
 async function selectCategory(id) {
+  state.view = 'category';
   state.activeCategoryId = id;
-  renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
-  updateTopbar();
-  updateAddItemAvailability();
-  await loadItems();
+  renderNav();
+  await renderView();
 }
 
 function activeCategory() {
@@ -1027,12 +1057,11 @@ function openCategoryModal() {
       );
       if (category === null) return;
       state.categories.push(category);
+      state.view = 'category';
       state.activeCategoryId = category.id;
-      renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
-      updateTopbar();
-      updateAddItemAvailability();
+      renderNav();
       closeCategoryModal();
-      await loadItems();
+      await renderView();
     } finally {
       createBtn.disabled = false;
     }
