@@ -95,16 +95,25 @@ async function verifyLogin(client, username, authProof) {
   const ok = await argon2.verify(user.password_hash, authProof).catch(() => false);
   if (!ok) return null;
 
-  await tursoExec(client, `UPDATE waystone_users SET last_login_at = ? WHERE id = ?`, [new Date().toISOString(), user.id]);
+  const loginCount = (Number(user.login_count) || 0) + 1;
+  await tursoExec(
+    client,
+    `UPDATE waystone_users SET last_login_at = ?, login_count = ? WHERE id = ?`,
+    [new Date().toISOString(), loginCount, user.id]
+  );
 
-  return { id: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, sessionVersion: Number(user.session_version) || 0 };
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    salt: user.pbkdf2_salt,
+    sessionVersion: Number(user.session_version) || 0,
+    loginCount,
+  };
 }
 
-// Salts aren't secret — they only need to be unique — so it's safe to hand
-// one back before the user has proven who they are; the client needs it to
-// derive the same authProof the server will check. For a username that
-// doesn't exist, a deterministic dummy salt keeps the response shape
-// identical either way instead of leaking which usernames are registered.
+// Salts only need to be unique, not secret. Unknown usernames get a
+// deterministic dummy salt so the response doesn't reveal who is registered.
 async function getAuthSalt(client, username) {
   const user = await findByUsername(client, username);
   if (user) return user.pbkdf2_salt;
