@@ -1,0 +1,32 @@
+.tab-grip {
+  flex-shrink: 0;
+  width: 10px;
+  margin-left: -10px;
+  margin-right: -4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+.tab-item:hover .tab-grip,
+.tab-item:focus-visible .tab-grip { opacity: 0.7; }
+.tab-grip:hover { opacity: 1; }
+
+.tab-item.dragging {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: var(--shadow-modal);
+  position: relative;
+  z-index: 2;
+}
+.tab-item.dragging .tab-grip { cursor: grabbing; opacity: 1; }
+.tab-item:focus-visible {
+  outline: 1px solid var(--accent-cycle, var(--accent));
+  outline-offset: -1px;
+}
+
+@media (hover: none) {
+  .tab-grip { opacity: 0.6; }
+}
