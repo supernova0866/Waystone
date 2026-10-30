@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { getClient } from './core/db/turso-client.js';
 import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable } from './core/db/schema.js';
-import { createCategory, saveCategory, deleteCategory, loadCategories } from './core/db/categories.js';
+import { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories } from './core/db/categories.js';
 import { createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
 import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
 import { checkRateLimit } from './core/auth/rate-limit.js';
@@ -34,7 +34,6 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
-// Legacy .html paths -> clean equivalents. 301 so bookmarks/links age out gracefully.
 const LEGACY_REDIRECTS = {
   '/index.html': '/',
   '/pages/login.html': '/invite',
@@ -223,6 +222,19 @@ async function handleCategories(req, res, url) {
   sendJson(res, 405, { error: 'Method not allowed' });
 }
 
+async function handleCategoryOrder(req, res) {
+  if (req.method !== 'PUT') return sendJson(res, 405, { error: 'Method not allowed' });
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const { ids } = await readJsonBody(req);
+  try {
+    await reorderCategories(getClient(), user.id, ids);
+    sendJson(res, 200, { ok: true });
+  } catch (e) {
+    sendJson(res, 400, { error: e.message });
+  }
+}
+
 async function handleItems(req, res, url) {
   const user = await requireUser(req, res);
   if (!user) return;
@@ -285,10 +297,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/accept-invite' && req.method === 'POST') return await handleAcceptInvite(req, res);
     if (pathname === '/api/users' && req.method === 'GET') return await handleListUsers(req, res);
     if (pathname === '/api/change-password' && req.method === 'POST') return await handleChangePassword(req, res);
+    if (pathname === '/api/categories/order') return await handleCategoryOrder(req, res);
     if (pathname === '/api/categories') return await handleCategories(req, res, url);
     if (pathname === '/api/items') return await handleItems(req, res, url);
 
-    // Legacy .html paths redirect to their clean equivalents.
     if (LEGACY_REDIRECTS[pathname]) return redirect(res, LEGACY_REDIRECTS[pathname]);
 
     if (pathname === '/') {
@@ -296,9 +308,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/settings') {
-      // No separate settings page anymore — same app shell as '/'. app.js
-      // detects this path on boot and opens the settings modal itself,
-      // then cleans the URL back to '/' so it isn't a "page" you can get stuck on.
       return serveFile(res, path.join(__dirname, 'index.html'));
     }
 
@@ -306,9 +315,6 @@ const server = http.createServer(async (req, res) => {
       return serveFile(res, path.join(__dirname, 'pages', 'handbook.html'));
     }
 
-    // /invite accepts an optional trailing code segment, e.g. /invite/GAMER1,
-    // so invite links can be shared as a single clickable URL. The code
-    // itself is read client-side from location.pathname and pre-filled.
     if (pathname === '/invite' || /^\/invite\/[^/]+$/.test(pathname)) {
       return serveFile(res, path.join(__dirname, 'pages', 'login.html'));
     }
