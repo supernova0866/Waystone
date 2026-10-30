@@ -1,7 +1,7 @@
-import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
+import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
 import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
-import { renderSidebarList, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
+import { renderSidebarList, setReorderHandler, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -168,6 +168,19 @@ async function selectCategory(id) {
 function activeCategory() {
   return state.categories.find(c => c.id === state.activeCategoryId) || null;
 }
+
+setReorderHandler(async (ids) => {
+  const previous = state.categories;
+  state.categories = ids.map(id => previous.find(c => c.id === id)).filter(Boolean);
+  state.categories.forEach((c, i) => { c.sortOrder = i; });
+  try {
+    await withSessionGuard(() => reorderCategories(ids));
+  } catch (err) {
+    state.categories = previous;
+    renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
+    alert('Could not save the new order: ' + err.message);
+  }
+});
 
 async function loadItems() {
   clearItemDisposers();
