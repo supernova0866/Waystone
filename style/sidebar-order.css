@@ -31,3 +31,13 @@
 @media (hover: none) {
   .tab-grip { opacity: 0.6; }
 }
+
+.sidebar-pinned {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tab-grip.spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+.card-grid-wrap > .empty-state { grid-column: 1 / -1; }
