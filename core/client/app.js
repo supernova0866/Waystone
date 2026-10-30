@@ -44,6 +44,7 @@ const el = {
   logoutBtn: document.getElementById('logout-btn'),
   modalBackdrop: document.getElementById('item-modal-backdrop'),
   modalBody: document.getElementById('item-modal-body'),
+  itemModalClose: document.getElementById('item-modal-close'),
   schemaModalBackdrop: document.getElementById('schema-modal-backdrop'),
   schemaModalBody: document.getElementById('schema-modal-body'),
   schemaModalTitle: document.getElementById('schema-modal-title'),
@@ -249,7 +250,14 @@ function renderGrid(category, decryptedItems) {
   el.cardGrid.innerHTML = '';
 
   if (decryptedItems.length === 0) {
-    el.cardGrid.innerHTML = `<div class="empty-state"><div class="es-icon">${category?.icon || '📄'}</div>No items in ${category?.name || 'this category'} yet.</div>`;
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    const icon = document.createElement('div');
+    icon.className = 'es-icon';
+    icon.textContent = category?.icon || '📄';
+    empty.appendChild(icon);
+    empty.appendChild(document.createTextNode(`No items in ${category?.name || 'this category'} yet.`));
+    el.cardGrid.appendChild(empty);
     return;
   }
 
@@ -384,6 +392,8 @@ function bumpCategoryCount(categoryId, delta) {
 function closeEditor() {
   el.modalBackdrop.style.display = 'none';
 }
+
+el.itemModalClose.addEventListener('click', closeEditor);
 
 let viewModalDisposers = [];
 let viewModalChanged = false;
@@ -940,7 +950,7 @@ async function wireSettingsAdmin() {
       const result = await createInvite(customCode || null);
       const resultEl = document.getElementById('settings-invite-result');
       resultEl.style.display = 'flex';
-      resultEl.innerHTML = `<span>Code: <strong>${result.code}</strong></span>`;
+      resultEl.textContent = `Code: ${result.code}`;
       await refreshUsers();
     } catch (e) {
       alert('Could not create invite: ' + e.message);
