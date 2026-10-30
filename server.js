@@ -41,6 +41,22 @@ const LEGACY_REDIRECTS = {
   '/pages/handbook.html': '/handbook',
 };
 
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '),
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+};
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
   res.end(body);
@@ -282,6 +298,8 @@ async function handleChangePassword(req, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
+
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
 
   try {
     if (pathname === '/api/login' && req.method === 'POST') return await handleLogin(req, res);
