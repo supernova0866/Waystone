@@ -1,6 +1,6 @@
 const PINNED = [
   { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'tags', icon: '🏷', label: 'Tags' },
+  { id: 'tags', icon: '🏷️', label: 'Tags' },
 ];
 
 function renderPinnedList(container, activeView, onSelect) {
@@ -39,18 +39,77 @@ function renderMessage(container, icon, text) {
   container.appendChild(empty);
 }
 
-function renderHomePlaceholder(container, categories) {
-  renderMessage(
-    container,
-    '🏠',
-    categories.length
-      ? 'Favorites, stats and search will live here.'
-      : 'No categories yet — create one to get started.'
-  );
+function statCard(label, value, breakdown = null) {
+  const card = document.createElement('div');
+  card.className = 'stat-card';
+
+  const labelEl = document.createElement('div');
+  labelEl.className = 'stat-label';
+  labelEl.textContent = label;
+
+  const valueEl = document.createElement('div');
+  valueEl.className = 'stat-value';
+  valueEl.textContent = value;
+
+  card.appendChild(labelEl);
+  card.appendChild(valueEl);
+
+  if (breakdown) {
+    const list = document.createElement('div');
+    list.className = 'stat-breakdown';
+    for (const [name, count] of breakdown) {
+      const row = document.createElement('div');
+      row.className = 'stat-breakdown-row';
+      const nameEl = document.createElement('span');
+      nameEl.textContent = name;
+      const countEl = document.createElement('span');
+      countEl.textContent = count;
+      row.appendChild(nameEl);
+      row.appendChild(countEl);
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+  }
+
+  return card;
+}
+
+function renderHomeView(container, { categories, loginCount, stats }) {
+  container.innerHTML = '';
+
+  const home = document.createElement('div');
+  home.className = 'home';
+
+  const grid = document.createElement('div');
+  grid.className = 'home-stats';
+  const total = stats ? stats.password + stats.totp + stats['backup-codes'] : '…';
+  grid.appendChild(statCard('Categories', categories.length));
+  grid.appendChild(statCard('Saved secrets', total, stats && [
+    ['Passwords', stats.password],
+    ['TOTP', stats.totp],
+    ['Backup codes', stats['backup-codes']],
+  ]));
+  grid.appendChild(statCard('Times logged in', loginCount));
+  home.appendChild(grid);
+
+  const section = document.createElement('div');
+  section.className = 'home-section';
+  const title = document.createElement('h3');
+  title.textContent = 'Favorites';
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = categories.length
+    ? 'Items you favorite will appear here, grouped by category.'
+    : 'No categories yet — create one to get started.';
+  section.appendChild(title);
+  section.appendChild(hint);
+  home.appendChild(section);
+
+  container.appendChild(home);
 }
 
 function renderTagsPlaceholder(container) {
   renderMessage(container, '🏷', 'Tags will live here.');
 }
 
-export { renderPinnedList, renderHomePlaceholder, renderTagsPlaceholder };
+export { renderPinnedList, renderHomeView, renderTagsPlaceholder };
