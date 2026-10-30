@@ -17,7 +17,7 @@
   .invite-code-input { text-transform: uppercase; letter-spacing: 0.2em; text-align: center; font-family: var(--font-mono); }
   .invite-error { font-size: 12.5px; color: var(--danger); text-align: center; min-height: 16px; margin: -4px 0 0; }
   .invite-success { font-size: 13px; color: var(--success); text-align: center; }
-  .invite-footer { display: flex; justify-content: center; margin-top: 4px; }
+  .invite-footer { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
   .invite-footer a { font-size: 12.5px; color: var(--text-muted); text-decoration: none; }
   .invite-footer a:hover { color: var(--accent); }
 </style>
@@ -65,6 +65,7 @@
     </div>
 
     <div class="invite-footer">
+      <a href="/">Already have an account? Log in</a>
       <a href="/handbook">How WayStone works</a>
     </div>
   </div>
@@ -96,14 +97,6 @@ const successBlock = document.getElementById('success-block');
 codeInput.addEventListener('input', () => {
   codeInput.value = codeInput.value.toUpperCase();
 });
-
-// Pretty URL support: an invite shared as /invite/CODE pre-fills the code
-// field and checks it immediately, so the link itself is a one-click invite.
-const inviteCodeFromPath = window.location.pathname.match(/^\/invite\/([^/]+)$/);
-if (inviteCodeFromPath) {
-  codeInput.value = decodeURIComponent(inviteCodeFromPath[1]).trim().toUpperCase();
-  codeForm.requestSubmit();
-}
 
 codeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -154,6 +147,19 @@ accountForm.addEventListener('submit', async (e) => {
     accountSubmit.textContent = 'Create account';
   }
 });
+
+// Runs after the submit handler is attached
+const inviteCodeFromPath = window.location.pathname.match(/^\/invite\/([^/]+)$/);
+if (inviteCodeFromPath) {
+  try {
+    codeInput.value = decodeURIComponent(inviteCodeFromPath[1]).trim().toUpperCase();
+  } catch (e) {
+    codeInput.value = '';
+  }
+  if (codeInput.value) codeForm.requestSubmit();
+}
+
+// here lay dragons
 </script>
 
 </body>
