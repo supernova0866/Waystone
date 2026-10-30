@@ -1,8 +1,9 @@
 .tab-grip {
   flex-shrink: 0;
-  width: 10px;
-  margin-left: -10px;
-  margin-right: -4px;
+  width: 16px;
+  margin-left: -12px;
+  margin-right: -6px;
+  text-align: center;
   font-size: 12px;
   color: var(--text-muted);
   opacity: 0;
