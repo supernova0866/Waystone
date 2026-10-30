@@ -12,17 +12,18 @@ async function ensureUsersTable(client) {
        invite_code TEXT UNIQUE NOT NULL,
        invite_used INTEGER DEFAULT 0,
        session_version INTEGER DEFAULT 0,
+       login_count INTEGER DEFAULT 0,
        created_at TEXT,
        accepted_at TEXT,
        last_login_at TEXT
      )`, []);
   if (error) throw new Error(error);
 
-  // CREATE TABLE IF NOT EXISTS is a no-op on a table that already existed
-  // before session_version was added, so it never gets the column. This
-  // adds it if missing and is silently ignored if it's already there.
+  // Fails harmlessly when the column already exists
   await tursoQuery(client.url, client.token,
     `ALTER TABLE waystone_users ADD COLUMN session_version INTEGER DEFAULT 0`, []);
+  await tursoQuery(client.url, client.token,
+    `ALTER TABLE waystone_users ADD COLUMN login_count INTEGER DEFAULT 0`, []);
 }
 
 async function ensureCategoriesTable(client) {
