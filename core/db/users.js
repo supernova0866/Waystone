@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import argon2 from 'argon2';
-import { tursoExec, tursoSelect } from './turso-client.js';
+import { tursoExec, tursoSelect, tursoBatch } from './turso-client.js';
 
 const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
@@ -126,6 +126,54 @@ async function bumpSessionVersion(client, userId) {
   await tursoExec(client, `UPDATE waystone_users SET session_version = session_version + 1 WHERE id = ?`, [userId]);
 }
 
+class VaultConflictError extends Error {
+  constructor(message = 'Your vault changed since it was loaded. Reload and try again.') {
+    super(message);
+    this.name = 'VaultConflictError';
+  }
+}
+
+const FAIL_IF_NO_CHANGE = `SELECT CASE WHEN changes() = 0 THEN abs(-9223372036854775808) ELSE 0 END`;
+
+async function changePasswordAndReencrypt(client, user, { newHash, items }) {
+  const current = await tursoSelect(client, `SELECT id, updated_at FROM items WHERE user_id = ?`, [user.id]);
+  const submitted = new Map(items.map(item => [item.id, item]));
+  if (current.length !== items.length || current.some(row => submitted.get(row.id)?.expectedUpdatedAt !== row.updated_at)) {
+    throw new VaultConflictError();
+  }
+
+  const now = new Date().toISOString();
+  const sessionVersion = Number(user.session_version) || 0;
+  const newSessionVersion = sessionVersion + 1;
+
+  const statements = [
+    {
+      sql: `UPDATE waystone_users SET password_hash = ?, session_version = ? WHERE id = ? AND session_version = ?`,
+      args: [newHash, newSessionVersion, user.id, sessionVersion],
+    },
+    { sql: FAIL_IF_NO_CHANGE },
+  ];
+  for (const item of items) {
+    statements.push({
+      sql: `UPDATE items SET data_enc = ?, iv = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?`,
+      args: [item.dataEnc, item.iv, now, item.id, user.id, item.expectedUpdatedAt],
+    });
+    statements.push({ sql: FAIL_IF_NO_CHANGE });
+  }
+  statements.push({
+    sql: `SELECT CASE WHEN (SELECT COUNT(*) FROM items WHERE user_id = ?) = ? THEN 0 ELSE abs(-9223372036854775808) END`,
+    args: [user.id, items.length],
+  });
+
+  try {
+    await tursoBatch(client, statements);
+  } catch (e) {
+    if (/overflow/i.test(e.message)) throw new VaultConflictError();
+    throw e;
+  }
+  return newSessionVersion;
+}
+
 async function listUsers(client) {
   const rows = await tursoSelect(client, `SELECT id, username, role, status, invite_code, invite_used, created_at, last_login_at FROM waystone_users ORDER BY created_at ASC`, []);
   return rows;
@@ -157,5 +205,7 @@ export {
   bumpSessionVersion,
   listUsers,
   seedAdminIfMissing,
+  changePasswordAndReencrypt,
+  VaultConflictError,
   generateRandomCode,
 };
