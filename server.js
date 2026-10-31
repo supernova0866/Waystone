@@ -3,10 +3,12 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import argon2 from 'argon2';
+
 import { getClient } from './core/db/turso-client.js';
 import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable } from './core/db/schema.js';
 import { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories } from './core/db/categories.js';
-import { createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
+import { ConflictError, createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
 import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
 import { checkRateLimit } from './core/auth/rate-limit.js';
 import {
@@ -19,6 +21,8 @@ import {
   bumpSessionVersion,
   listUsers,
   seedAdminIfMissing,
+  changePasswordAndReencrypt,
+  VaultConflictError,
 } from './core/db/users.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +60,8 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
 };
+
+const DEPLOYED_COMMIT = (process.env.RENDER_GIT_COMMIT || '').slice(0, 6);
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
@@ -149,7 +155,7 @@ async function handleLogin(req, res) {
   if (!user) return sendJson(res, 401, { error: 'Incorrect username or password' });
 
   setSessionCookie(res, user.id, user.sessionVersion);
-  sendJson(res, 200, { ok: true, userId: user.id, username: user.username, role: user.role, salt: user.salt, loginCount: user.loginCount });
+  sendJson(res, 200, { ok: true, userId: user.id, username: user.username, role: user.role, salt: user.salt, loginCount: user.loginCount, commit: DEPLOYED_COMMIT });
 }
 
 async function handleLogout(req, res) {
@@ -166,7 +172,7 @@ async function handleSessionCheck(req, res) {
   if (!info) return sendJson(res, 200, { authenticated: false });
   const user = await findById(getClient(), info.userId);
   if (!user || Number(user.session_version) !== info.sessionVersion) return sendJson(res, 200, { authenticated: false });
-  sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, loginCount: Number(user.login_count) || 0 });
+  sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, loginCount: Number(user.login_count) || 0, commit: DEPLOYED_COMMIT });
 }
 
 async function handleAuthSalt(req, res, username) {
@@ -259,7 +265,14 @@ async function handleItems(req, res, url) {
 
   if (req.method === 'GET') return sendJson(res, 200, await loadItems(client, userId, url.searchParams.get('categoryId')));
   if (req.method === 'POST') return sendJson(res, 200, await createItem(client, userId, await readJsonBody(req)));
-  if (req.method === 'PUT') return sendJson(res, 200, await saveItem(client, userId, await readJsonBody(req)));
+  if (req.method === 'PUT') {
+    try {
+      return sendJson(res, 200, await saveItem(client, userId, await readJsonBody(req)));
+    } catch (e) {
+      if (e instanceof ConflictError) return sendJson(res, 409, { error: e.message });
+      throw e;
+    }
+  }
   if (req.method === 'DELETE') {
     const id = url.searchParams.get('id');
     if (!id) return sendJson(res, 400, { error: 'Missing id' });
@@ -272,13 +285,21 @@ async function handleItems(req, res, url) {
 async function handleChangePassword(req, res) {
   const user = await requireUser(req, res);
   if (!user) return;
-  const { oldAuthProof, newAuthProof } = await readJsonBody(req);
-  if (!oldAuthProof || !newAuthProof) return sendJson(res, 400, { error: 'Missing fields' });
 
-  const client = getClient();
-  const argon2 = (await import('argon2')).default;
+  if (!checkRateLimit(`change-password:${user.id}`, { max: 10, windowMs: 15 * 60 * 1000 })) {
+    return sendJson(res, 429, { error: 'Too many attempts — try again later' });
+  }
+
+  const { oldAuthProof, newAuthProof, items } = await readJsonBody(req);
+  if (!oldAuthProof || !newAuthProof || !Array.isArray(items)) return sendJson(res, 400, { error: 'Missing fields' });
+
+  const itemsValid = items.every(i =>
+    i && typeof i.id === 'string' && typeof i.dataEnc === 'string' && typeof i.iv === 'string' && typeof i.expectedUpdatedAt === 'string'
+  ) && new Set(items.map(i => i.id)).size === items.length;
+  if (!itemsValid) return sendJson(res, 400, { error: 'Invalid items' });
+
   const ok = await argon2.verify(user.password_hash, oldAuthProof).catch(() => false);
-  if (!ok) return sendJson(res, 401, { error: 'Incorrect current password' });
+  if (!ok) return sendJson(res, 403, { error: 'Incorrect current password' });
 
   const newHash = await argon2.hash(newAuthProof, {
     type: argon2.argon2id,
@@ -287,12 +308,14 @@ async function handleChangePassword(req, res) {
     parallelism: 1,
   });
 
-  const newSessionVersion = Number(user.session_version || 0) + 1;
-  const { tursoExec } = await import('./core/db/turso-client.js');
-  await tursoExec(client, `UPDATE waystone_users SET password_hash = ?, session_version = ? WHERE id = ?`, [newHash, newSessionVersion, user.id]);
-
-  setSessionCookie(res, user.id, newSessionVersion);
-  sendJson(res, 200, { ok: true, salt: user.pbkdf2_salt });
+  try {
+    const newSessionVersion = await changePasswordAndReencrypt(getClient(), user, { newHash, items });
+    setSessionCookie(res, user.id, newSessionVersion);
+    sendJson(res, 200, { ok: true });
+  } catch (e) {
+    if (e instanceof VaultConflictError) return sendJson(res, 409, { error: e.message });
+    throw e;
+  }
 }
 
 const server = http.createServer(async (req, res) => {
