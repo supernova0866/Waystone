@@ -25,6 +25,14 @@ function buildEntry(row, data, category) {
     id: row.id,
     categoryId: row.categoryId,
     updatedAt: row.updatedAt,
+    row: {
+      id: row.id,
+      categoryId: row.categoryId,
+      dataEnc: row.dataEnc,
+      iv: row.iv,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    },
     title: data.title || '',
     subtitle: data.subtitle || '',
     text,
@@ -71,4 +79,31 @@ function secretStats() {
   return counts;
 }
 
-export { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats };
+function favoriteEntries() {
+  return [...entries.values()]
+    .filter(entry => entry.favorite)
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function searchIndex(query, limit = 50) {
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return { results: [], total: 0 };
+
+  const matches = [];
+  for (const entry of entries.values()) {
+    const title = entry.title.toLowerCase();
+    const subtitle = entry.subtitle.toLowerCase();
+    const haystack = `${title} ${subtitle} ${entry.text.join(' ').toLowerCase()}`;
+    if (!tokens.every(token => haystack.includes(token))) continue;
+
+    let score = 3;
+    if (tokens.every(token => title.includes(token))) score = title.startsWith(tokens[0]) ? 0 : 1;
+    else if (tokens.every(token => subtitle.includes(token))) score = 2;
+    matches.push({ entry, score });
+  }
+
+  matches.sort((a, b) => a.score - b.score || a.entry.title.localeCompare(b.entry.title));
+  return { results: matches.slice(0, limit).map(m => m.entry), total: matches.length };
+}
+
+export { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex };
