@@ -1,7 +1,7 @@
 import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
-import { unlockVault, lockVault, isUnlocked, encryptItemData, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
+import { unlockVault, deriveVaultKey, installVaultKey, lockVault, isUnlocked, encryptItemData, encryptItemDataWithKey, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
-import { renderSidebarList, setReorderHandler, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
+import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
 import { renderPinnedList, renderHomeView, renderTagsPlaceholder } from '/core/client/views.js';
 import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats } from '/core/client/vault-index.js';
 import { buildIsel } from '/core/client/isel.js';
@@ -12,6 +12,7 @@ const state = {
   username: null,
   role: null,
   loginCount: 0,
+  commit: '',
   categories: [],
   view: 'home',
   activeCategoryId: null,
@@ -198,6 +199,7 @@ function renderHome() {
   renderHomeView(el.cardGrid, {
     categories: state.categories,
     loginCount: state.loginCount,
+    commit: state.commit,
     stats: isIndexReady() ? secretStats() : null,
   });
 }
@@ -335,8 +337,18 @@ async function consumeBackupCode(item, data, field, codes) {
   const { code, remaining } = consumeCode(codes || []);
   if (code) navigator.clipboard?.writeText(code).catch(() => {});
   data.fields[field.id] = remaining;
-  const enc = await encryptItemData(data);
-  await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, ...enc }));
+  try {
+    const enc = await encryptItemData(data);
+    const saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
+    if (saved) item.updatedAt = saved.updatedAt;
+  } catch (err) {
+    data.fields[field.id] = codes;
+    if (err.status !== 409) throw err;
+    alert('This item was changed elsewhere and has been reloaded. Check your backup codes before using the one just copied.');
+    await loadItems();
+    refreshIndex();
+    return codes || [];
+  }
   const owner = state.categories.find(c => c.id === item.categoryId);
   if (owner) upsertIndex(buildEntry(item, data, owner));
   return remaining;
@@ -439,7 +451,7 @@ function openEditor(item, data) {
       const enc = await encryptItemData(newData);
       let saved;
       if (item.id) {
-        saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, ...enc }));
+        saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
       } else {
         saved = await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: state.activeCategoryId, ...enc }));
         bumpCategoryCount(state.activeCategoryId, 1);
@@ -447,6 +459,12 @@ function openEditor(item, data) {
       if (saved) upsertIndex(buildEntry(saved, newData, category));
       closeEditor();
       await loadItems();
+    } catch (err) {
+      if (err.status !== 409) throw err;
+      alert('This item was changed elsewhere, so your edit was not saved. The latest version has been reloaded.');
+      closeEditor();
+      await loadItems();
+      refreshIndex();
     } finally {
       saveBtn.disabled = false;
     }
@@ -531,7 +549,7 @@ function openSchemaEditor(category) {
   nameRow.className = 'input-row';
   const iconInput = document.createElement('input');
   iconInput.className = 'input icon-input';
-  iconInput.maxLength = 4;
+  attachEmojiInput(iconInput);
   iconInput.title = 'Emoji icon for this category';
   iconInput.value = working.icon || '📁';
   iconInput.addEventListener('input', () => { working.icon = iconInput.value; });
@@ -788,7 +806,7 @@ async function openSettingsModal() {
         <label class="field-label">New password</label>
         <input class="input" type="password" id="settings-new-password" autocomplete="new-password" />
       </div>
-      <p class="hint" style="margin-bottom:14px">Changing this re-encrypts every item in your vault. It can take a moment if you have a lot of items.</p>
+      <p class="hint" style="margin-bottom:14px">Changing this re-encrypts every item in your vault. It can take a moment if you have a lot of items. Keep this tab open until it finishes.</p>
       <div id="settings-password-error" class="error-text" style="display:none"></div>
       <div id="settings-password-success" style="display:none;color:var(--success);font-size:13px;margin-top:10px">Password changed and vault re-encrypted.</div>
       <button class="btn btn-primary" type="submit" id="settings-password-submit">Change password</button>
@@ -902,22 +920,30 @@ function wireSettingsSecurity() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Re-encrypting…';
     try {
-      const allItems = await fetchItems();
-      const decrypted = [];
-      for (const item of allItems) {
-        decrypted.push({ item, data: await decryptItemData(item) });
-      }
+      const rows = await fetchItems();
+      const decrypted = await Promise.all(rows.map(async (row) => {
+        try {
+          return { row, data: await decryptItemData(row) };
+        } catch (e) {
+          throw new Error('An item could not be decrypted, so the password was not changed.');
+        }
+      }));
 
       const session = await checkSession();
       const oldAuthProof = await deriveAuthProof(oldPassword, session.salt);
       const newAuthProof = await deriveAuthProof(newPassword, session.salt);
-      const result = await changePassword(oldAuthProof, newAuthProof);
-      await unlockVault(newPassword, result.salt);
+      const newKey = await deriveVaultKey(newPassword, session.salt);
 
-      for (const { item, data } of decrypted) {
-        const enc = await encryptItemData(data);
-        await saveItem({ id: item.id, categoryId: item.categoryId, ...enc });
+      const reencrypted = [];
+      for (const { row, data } of decrypted) {
+        const enc = await encryptItemDataWithKey(newKey, data);
+        reencrypted.push({ id: row.id, dataEnc: enc.dataEnc, iv: enc.iv, expectedUpdatedAt: row.updatedAt });
       }
+
+      await changePassword(oldAuthProof, newAuthProof, reencrypted);
+      installVaultKey(newKey);
+      renderView().catch(() => {});
+      refreshIndex();
 
       successEl.style.display = 'block';
       document.getElementById('settings-old-password').value = '';
@@ -1063,12 +1089,12 @@ function openCategoryModal() {
   nameRow.className = 'input-row';
   const iconInput = document.createElement('input');
   iconInput.className = 'input icon-input';
-  iconInput.maxLength = 4;
+  attachEmojiInput(iconInput);
   iconInput.title = 'Emoji icon for this category';
   iconInput.value = '📁';
   const nameInput = document.createElement('input');
   nameInput.className = 'input';
-  nameInput.placeholder = 'e.g. Characters';
+  nameInput.placeholder = 'e.g. Email Accounts';
   nameRow.appendChild(iconInput);
   nameRow.appendChild(nameInput);
   nameField.appendChild(nameRow);
@@ -1195,6 +1221,7 @@ el.loginForm.addEventListener('submit', async (e) => {
     state.username = result.username;
     state.role = result.role;
     state.loginCount = result.loginCount || 0;
+    state.commit = result.commit || '';
     await showApp();
   } catch (err) {
     el.loginError.textContent = 'Incorrect username or password.';
@@ -1217,6 +1244,7 @@ el.unlockForm.addEventListener('submit', async (e) => {
     state.username = session.username;
     state.role = session.role;
     state.loginCount = session.loginCount || 0;
+    state.commit = session.commit || '';
     await showApp();
   } catch (err) {
     el.unlockError.textContent = 'Could not unlock with that password.';
@@ -1237,6 +1265,7 @@ async function boot() {
   state.username = session.username;
   state.role = session.role;
   state.loginCount = session.loginCount || 0;
+  state.commit = session.commit || '';
 
   if (isUnlocked()) {
     await showApp();
