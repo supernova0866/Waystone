@@ -1,5 +1,12 @@
 import { tursoExec, tursoSelect } from './turso-client.js';
 
+class ConflictError extends Error {
+  constructor(message = 'Item changed elsewhere') {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 async function createItem(client, userId, item) {
   const now = new Date().toISOString();
   await tursoExec(
@@ -7,17 +14,19 @@ async function createItem(client, userId, item) {
     `INSERT INTO items (id, user_id, category_id, data_enc, iv, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [item.id, userId, item.categoryId, item.dataEnc, item.iv, now, now]
   );
-  return { ...item, createdAt: now, updatedAt: now };
+  return { id: item.id, categoryId: item.categoryId, createdAt: now, updatedAt: now };
 }
 
 async function saveItem(client, userId, item) {
+  if (!item.expectedUpdatedAt) throw new ConflictError();
   const now = new Date().toISOString();
-  await tursoExec(
+  const changed = await tursoExec(
     client,
-    `UPDATE items SET data_enc = ?, iv = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-    [item.dataEnc, item.iv, now, item.id, userId]
+    `UPDATE items SET data_enc = ?, iv = ?, updated_at = ? WHERE id = ? AND user_id = ? AND updated_at = ?`,
+    [item.dataEnc, item.iv, now, item.id, userId, item.expectedUpdatedAt]
   );
-  return { ...item, updatedAt: now };
+  if (!changed) throw new ConflictError();
+  return { id: item.id, categoryId: item.categoryId, updatedAt: now };
 }
 
 async function deleteItem(client, userId, itemId) {
@@ -38,4 +47,4 @@ async function loadItems(client, userId, categoryId = null) {
   }));
 }
 
-export { createItem, saveItem, deleteItem, loadItems };
+export { ConflictError, createItem, saveItem, deleteItem, loadItems };
