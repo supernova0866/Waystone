@@ -2,8 +2,8 @@ import { checkSession, login, logout, fetchCategories, createCategory, saveCateg
 import { unlockVault, deriveVaultKey, installVaultKey, lockVault, isUnlocked, encryptItemData, encryptItemDataWithKey, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
 import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
-import { renderPinnedList, renderHomeView, renderTagsPlaceholder } from '/core/client/views.js';
-import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats } from '/core/client/vault-index.js';
+import { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton, renderTagsPlaceholder } from '/core/client/views.js';
+import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex } from '/core/client/vault-index.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -13,6 +13,7 @@ const state = {
   role: null,
   loginCount: 0,
   commit: '',
+  searchQuery: '',
   categories: [],
   view: 'home',
   activeCategoryId: null,
@@ -21,6 +22,7 @@ const state = {
 };
 
 let indexRun = 0;
+let homeRun = 0;
 
 const el = {
   loginGate: document.getElementById('login-gate'),
@@ -83,6 +85,8 @@ function clearItemDisposers() {
 function resetState() {
   clearItemDisposers();
   indexRun++;
+  homeRun++;
+  state.searchQuery = '';
   clearIndex();
   state.categories = [];
   state.view = 'home';
@@ -195,13 +199,88 @@ async function renderView() {
   await loadItems();
 }
 
-function renderHome() {
-  renderHomeView(el.cardGrid, {
+async function renderHome() {
+  const run = ++homeRun;
+  clearItemDisposers();
+
+  let refs;
+  refs = renderHomeView(el.cardGrid, {
     categories: state.categories,
     loginCount: state.loginCount,
     commit: state.commit,
     stats: isIndexReady() ? secretStats() : null,
+    query: state.searchQuery,
+    onSearch: (query) => {
+      state.searchQuery = query;
+      applySearch(refs);
+    },
   });
+  applySearch(refs);
+
+  if (!isIndexReady()) {
+    renderFavoriteGroups(refs.favoritesEl, { loading: true });
+    return;
+  }
+
+  const decrypted = await Promise.all(favoriteEntries().map(async (entry) => {
+    try {
+      return { entry, data: await decryptItemData(entry.row) };
+    } catch (e) {
+      return null;
+    }
+  }));
+  if (run !== homeRun || state.view !== 'home') return;
+
+  const groups = [];
+  for (const category of state.categories) {
+    const cards = [];
+    for (const found of decrypted) {
+      if (!found || found.entry.categoryId !== category.id) continue;
+      const { card, dispose } = buildCard(found.entry.row, category, found.data);
+      state.disposers.push(dispose);
+      cards.push(card);
+    }
+    if (cards.length) groups.push({ category, cards });
+  }
+  renderFavoriteGroups(refs.favoritesEl, { groups, hasCategories: state.categories.length > 0 });
+}
+
+function applySearch(refs) {
+  const query = state.searchQuery.trim();
+  refs.bodyEl.classList.toggle('hidden', !!query);
+  refs.resultsEl.classList.toggle('hidden', !query);
+  if (!query) return;
+
+  const ready = isIndexReady();
+  const { results, total } = ready ? searchIndex(query) : { results: [], total: 0 };
+  renderSearchResults(refs.resultsEl, {
+    query,
+    ready,
+    results,
+    total,
+    categoriesById: new Map(state.categories.map(c => [c.id, c])),
+    onView: (entry) => openIndexedItem(entry, 'view'),
+    onEdit: (entry) => openIndexedItem(entry, 'edit'),
+  });
+}
+
+async function openIndexedItem(entry, mode) {
+  const category = state.categories.find(c => c.id === entry.categoryId);
+  if (!category) return;
+  let data;
+  try {
+    data = await decryptItemData(entry.row);
+  } catch (e) {
+    alert('Could not decrypt this item.');
+    return;
+  }
+  if (mode === 'edit') openEditor(entry.row, data, category);
+  else openViewModal(entry.row, category, data);
+}
+
+async function reloadCurrentView() {
+  if (state.view === 'home') return renderHome();
+  if (state.view === 'category') return loadItems();
 }
 
 function renderTags() {
@@ -222,6 +301,7 @@ function updateAddItemAvailability() {
 }
 
 async function selectView(view) {
+  state.searchQuery = '';
   state.view = view;
   state.activeCategoryId = null;
   renderNav();
@@ -229,6 +309,7 @@ async function selectView(view) {
 }
 
 async function selectCategory(id) {
+  state.searchQuery = '';
   state.view = 'category';
   state.activeCategoryId = id;
   renderNav();
@@ -302,12 +383,18 @@ function renderSkeletons(count) {
   }
 }
 
-function swapSkeletonForCard(idx, category, item, data) {
+function buildCard(item, category, data) {
   const { card, dispose } = createItemCard(item, category, data, {
-    onOpen: (item) => openEditor(item, data),
-    onView: (item, category, data) => openViewModal(item, category, data),
-    onConsumeBackupCode: (item, field, codes) => consumeBackupCode(item, data, field, codes),
+    onOpen: (row) => openEditor(row, data, category),
+    onView: (row, owner, itemData) => openViewModal(row, owner, itemData),
+    onConsumeBackupCode: (row, field, codes) => consumeBackupCode(row, data, field, codes),
   });
+  attachFavoriteButton(card, data.favorite === true, () => toggleFavorite(item, data));
+  return { card, dispose };
+}
+
+function swapSkeletonForCard(idx, category, item, data) {
+  const { card, dispose } = buildCard(item, category, data);
   state.disposers.push(dispose);
 
   const slot = el.cardGrid.children[idx];
@@ -333,6 +420,11 @@ function renderGrid(category, decryptedItems) {
   decryptedItems.forEach(({ item, data }, idx) => swapSkeletonForCard(idx, category, item, data));
 }
 
+function syncIndex(row, enc, data) {
+  const category = state.categories.find(c => c.id === row.categoryId);
+  if (category) upsertIndex(buildEntry({ ...row, dataEnc: enc.dataEnc, iv: enc.iv }, data, category));
+}
+
 async function consumeBackupCode(item, data, field, codes) {
   const { code, remaining } = consumeCode(codes || []);
   if (code) navigator.clipboard?.writeText(code).catch(() => {});
@@ -340,18 +432,43 @@ async function consumeBackupCode(item, data, field, codes) {
   try {
     const enc = await encryptItemData(data);
     const saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
-    if (saved) item.updatedAt = saved.updatedAt;
+    if (saved) {
+      item.updatedAt = saved.updatedAt;
+      syncIndex(item, enc, data);
+    }
   } catch (err) {
     data.fields[field.id] = codes;
     if (err.status !== 409) throw err;
     alert('This item was changed elsewhere and has been reloaded. Check your backup codes before using the one just copied.');
-    await loadItems();
+    await reloadCurrentView();
     refreshIndex();
     return codes || [];
   }
-  const owner = state.categories.find(c => c.id === item.categoryId);
-  if (owner) upsertIndex(buildEntry(item, data, owner));
   return remaining;
+}
+
+async function toggleFavorite(item, data) {
+  const previous = data.favorite === true;
+  data.favorite = !previous;
+  try {
+    const enc = await encryptItemData(data);
+    const saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
+    if (!saved) {
+      data.favorite = previous;
+      return previous;
+    }
+    item.updatedAt = saved.updatedAt;
+    syncIndex(item, enc, data);
+  } catch (err) {
+    data.favorite = previous;
+    if (err.status !== 409) throw err;
+    alert('This item was changed elsewhere and has been reloaded.');
+    await reloadCurrentView();
+    refreshIndex();
+    return previous;
+  }
+  if (state.view === 'home') renderHome();
+  return data.favorite;
 }
 
 function fieldInput(field, value) {
@@ -378,8 +495,7 @@ function fieldInput(field, value) {
   return { el: i, get: () => i.value };
 }
 
-function openEditor(item, data) {
-  const category = activeCategory();
+function openEditor(item, data, category = activeCategory()) {
   el.modalBody.innerHTML = '';
 
   const { titleField: titleFieldDef, subtitleField: subtitleFieldDef } = pickTitleFields(category?.fields);
@@ -418,6 +534,16 @@ function openEditor(item, data) {
     getters[field.id] = get;
   }
 
+  const favoriteRow = document.createElement('label');
+  favoriteRow.className = 'checkbox-row';
+  favoriteRow.style.marginBottom = '16px';
+  const favoriteInput = document.createElement('input');
+  favoriteInput.type = 'checkbox';
+  favoriteInput.checked = data.favorite === true;
+  favoriteRow.appendChild(favoriteInput);
+  favoriteRow.appendChild(document.createTextNode('Favorite'));
+  el.modalBody.appendChild(favoriteRow);
+
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   actions.innerHTML = `
@@ -433,9 +559,9 @@ function openEditor(item, data) {
     if (!confirm('Delete this item? This cannot be undone.')) return;
     await withSessionGuard(() => deleteItem(item.id));
     removeFromIndex(item.id);
-    bumpCategoryCount(state.activeCategoryId, -1);
+    bumpCategoryCount(category.id, -1);
     closeEditor();
-    await loadItems();
+    await reloadCurrentView();
   });
   actions.querySelector('#modal-save').addEventListener('click', async () => {
     const saveBtn = actions.querySelector('#modal-save');
@@ -447,23 +573,24 @@ function openEditor(item, data) {
         title: (titleFieldDef && fieldValues[titleFieldDef.id]) || data.title || 'Untitled',
         subtitle: (subtitleFieldDef && fieldValues[subtitleFieldDef.id]) || '',
         fields: fieldValues,
+        favorite: favoriteInput.checked,
       };
       const enc = await encryptItemData(newData);
       let saved;
       if (item.id) {
-        saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: state.activeCategoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
+        saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: category.id, expectedUpdatedAt: item.updatedAt, ...enc }));
       } else {
-        saved = await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: state.activeCategoryId, ...enc }));
-        bumpCategoryCount(state.activeCategoryId, 1);
+        saved = await withSessionGuard(() => createItem({ id: crypto.randomUUID(), categoryId: category.id, ...enc }));
+        bumpCategoryCount(category.id, 1);
       }
-      if (saved) upsertIndex(buildEntry(saved, newData, category));
+      if (saved) syncIndex(saved, enc, newData);
       closeEditor();
-      await loadItems();
+      await reloadCurrentView();
     } catch (err) {
       if (err.status !== 409) throw err;
       alert('This item was changed elsewhere, so your edit was not saved. The latest version has been reloaded.');
       closeEditor();
-      await loadItems();
+      await reloadCurrentView();
       refreshIndex();
     } finally {
       saveBtn.disabled = false;
@@ -531,7 +658,7 @@ function closeViewModal() {
   el.viewModalBackdrop.style.display = 'none';
   if (viewModalChanged) {
     viewModalChanged = false;
-    loadItems();
+    reloadCurrentView();
   }
 }
 
