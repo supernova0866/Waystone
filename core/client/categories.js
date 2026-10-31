@@ -87,6 +87,37 @@ function renderSidebarList(container, categories, activeId, onSelect) {
   }
 }
 
+const EMOJI_RE = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+  ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  : null;
+
+function lastEmoji(text) {
+  const parts = segmenter ? [...segmenter.segment(text)].map(s => s.segment) : Array.from(text);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (EMOJI_RE.test(parts[i])) return parts[i];
+  }
+  return '';
+}
+
+function attachEmojiInput(input) {
+  let previous = '';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+
+  const normalize = () => {
+    if (input.value === '') return;
+    input.value = lastEmoji(input.value) || previous;
+  };
+
+  input.addEventListener('beforeinput', () => { previous = input.value; });
+  input.addEventListener('input', (e) => { if (!e.isComposing) normalize(); });
+  input.addEventListener('compositionend', () => {
+    normalize();
+    input.dispatchEvent(new Event('input'));
+  });
+}
+
 function newFieldId() {
   return 'f' + Math.random().toString(36).slice(2, 8);
 }
@@ -110,4 +141,4 @@ function pickTitleFields(fields) {
   return { titleField, subtitleField };
 }
 
-export { renderSidebarList, setReorderHandler, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
+export { renderSidebarList, setReorderHandler, attachEmojiInput, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
