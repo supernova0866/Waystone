@@ -50,8 +50,8 @@ async function listUsers() {
   return request('/api/users', { method: 'GET' });
 }
 
-async function changePassword(oldAuthProof, newAuthProof) {
-  return request('/api/change-password', { method: 'POST', body: JSON.stringify({ oldAuthProof, newAuthProof }) });
+async function changePassword(oldAuthProof, newAuthProof, items) {
+  return request('/api/change-password', { method: 'POST', body: JSON.stringify({ oldAuthProof, newAuthProof, items }) });
 }
 
 async function fetchCategories() {
