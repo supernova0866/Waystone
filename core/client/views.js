@@ -1,6 +1,6 @@
 const PINNED = [
   { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'tags', icon: '🏷️', label: 'Tags' },
+  { id: 'tags', icon: '🏷', label: 'Tags' },
 ];
 
 function renderPinnedList(container, activeView, onSelect) {
@@ -74,7 +74,7 @@ function statCard(label, value, breakdown = null) {
   return card;
 }
 
-function renderHomeView(container, { categories, loginCount, stats }) {
+function renderHomeView(container, { categories, loginCount, commit, stats }) {
   container.innerHTML = '';
 
   const home = document.createElement('div');
@@ -90,6 +90,7 @@ function renderHomeView(container, { categories, loginCount, stats }) {
     ['Backup codes', stats['backup-codes']],
   ]));
   grid.appendChild(statCard('Times logged in', loginCount));
+  grid.appendChild(statCard('Deployed commit', commit || '—'));
   home.appendChild(grid);
 
   const section = document.createElement('div');
