@@ -1,9 +1,10 @@
-import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
+import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, fetchTags, createTag, renameTag, deleteTag, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
 import { unlockVault, deriveVaultKey, installVaultKey, lockVault, isUnlocked, encryptItemData, encryptItemDataWithKey, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
-import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
-import { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton, renderTagsPlaceholder } from '/core/client/views.js';
-import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex } from '/core/client/vault-index.js';
+import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newTagId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
+import { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton } from '/core/client/views.js';
+import { TAG_SORTS, closePopover, attachTagArea, openTagPicker, openTagList, renderTagList, renderTagDetailShell, renderCardGrid } from '/core/client/tags-ui.js';
+import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex, tagCounts, entriesWithTag } from '/core/client/vault-index.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -14,6 +15,10 @@ const state = {
   loginCount: 0,
   commit: '',
   searchQuery: '',
+  tags: [],
+  tagsLoaded: false,
+  tagId: null,
+  tagSort: TAG_SORTS[0],
   categories: [],
   view: 'home',
   activeCategoryId: null,
@@ -23,6 +28,7 @@ const state = {
 
 let indexRun = 0;
 let homeRun = 0;
+let tagsRun = 0;
 
 const el = {
   loginGate: document.getElementById('login-gate'),
@@ -50,6 +56,11 @@ const el = {
   addItemBtn: document.getElementById('add-item-btn'),
   editSchemaBtn: document.getElementById('edit-schema-btn'),
   addCategoryBtn: document.getElementById('add-category-btn'),
+  addTagBtn: document.getElementById('add-tag-btn'),
+  tagModalBackdrop: document.getElementById('tag-modal-backdrop'),
+  tagModalBody: document.getElementById('tag-modal-body'),
+  tagModalTitle: document.getElementById('tag-modal-title'),
+  tagModalClose: document.getElementById('tag-modal-close'),
   lockBtn: document.getElementById('lock-btn'),
   logoutBtn: document.getElementById('logout-btn'),
   modalBackdrop: document.getElementById('item-modal-backdrop'),
@@ -86,7 +97,11 @@ function resetState() {
   clearItemDisposers();
   indexRun++;
   homeRun++;
+  tagsRun++;
   state.searchQuery = '';
+  state.tags = [];
+  state.tagsLoaded = false;
+  state.tagId = null;
   clearIndex();
   state.categories = [];
   state.view = 'home';
@@ -97,6 +112,7 @@ function resetState() {
 async function showApp() {
   hideAllGates();
   el.app.style.display = '';
+  await loadTags();
   await loadCategories();
   refreshIndex();
 
@@ -174,6 +190,7 @@ async function loadVaultIndex() {
 
   replaceIndex(built.filter(Boolean));
   if (state.view === 'home') renderHome();
+  else if (state.view === 'tags') renderTags();
 }
 
 function refreshIndex() {
@@ -189,6 +206,7 @@ function renderNav() {
 
 async function renderView() {
   clearItemDisposers();
+  closePopover();
   if (state.view === 'category' && !activeCategory()) {
     state.view = 'home';
     state.activeCategoryId = null;
@@ -200,6 +218,7 @@ async function renderView() {
 }
 
 async function renderHome() {
+  if (state.view !== 'home') return;
   const run = ++homeRun;
   clearItemDisposers();
 
@@ -281,27 +300,291 @@ async function openIndexedItem(entry, mode) {
 async function reloadCurrentView() {
   if (state.view === 'home') return renderHome();
   if (state.view === 'category') return loadItems();
+  if (state.view === 'tags') return renderTags();
 }
 
-function renderTags() {
-  renderTagsPlaceholder(el.cardGrid);
+async function loadTags() {
+  const result = await withSessionGuard(() => fetchTags());
+  if (result === null) return;
+  state.tags = result;
+  state.tagsLoaded = true;
+}
+
+function sortTags() {
+  state.tags.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+function tagsById() {
+  return new Map(state.tags.map(t => [t.id, t]));
+}
+
+function liveTagIds(ids) {
+  const list = Array.isArray(ids) ? ids : [];
+  if (!state.tagsLoaded) return list;
+  const known = tagsById();
+  return list.filter(id => known.has(id));
+}
+
+function resolveTags(data) {
+  const known = tagsById();
+  return (Array.isArray(data.tags) ? data.tags : []).map(id => known.get(id)).filter(Boolean);
+}
+
+async function ensureTag(name) {
+  const clean = name.trim();
+  if (!clean || clean.length > 32) throw new Error('Tag names must be 1-32 characters.');
+  const existing = state.tags.find(t => t.name.toLowerCase() === clean.toLowerCase());
+  if (existing) return existing;
+  const created = await withSessionGuard(() => createTag({ id: newTagId(), name: clean }));
+  if (created === null) throw new Error('Your session expired.');
+  state.tags.push(created);
+  sortTags();
+  return created;
+}
+
+async function openTag(id) {
+  state.searchQuery = '';
+  state.view = 'tags';
+  state.activeCategoryId = null;
+  state.tagId = id;
+  renderNav();
+  await renderView();
+}
+
+function cardFor(found, category) {
+  const { card, dispose } = buildCard(found.entry.row, category, found.data);
+  state.disposers.push(dispose);
+  return card;
+}
+
+async function renderTags() {
+  if (state.view !== 'tags') return;
+  const run = ++tagsRun;
+  clearItemDisposers();
+  if (state.tagId && !state.tags.some(t => t.id === state.tagId)) state.tagId = null;
+  updateTopbar();
+
+  if (!state.tagId) {
+    renderTagList(el.cardGrid, {
+      tags: state.tags,
+      counts: isIndexReady() ? tagCounts() : null,
+      onOpen: (tag) => openTag(tag.id),
+      onRename: (tag) => openTagModal(tag),
+      onDelete: (tag) => deleteTagFlow(tag),
+    });
+    return;
+  }
+
+  const tag = state.tags.find(t => t.id === state.tagId);
+  const content = renderTagDetailShell(el.cardGrid, {
+    tag,
+    sort: state.tagSort,
+    onBack: () => selectView('tags'),
+    onSort: (value) => {
+      state.tagSort = value;
+      renderTags();
+    },
+  });
+  if (!isIndexReady()) {
+    renderCardGrid(content, [], 'Loading…');
+    return;
+  }
+
+  const decrypted = await Promise.all(entriesWithTag(tag.id).map(async (entry) => {
+    try {
+      return { entry, data: await decryptItemData(entry.row) };
+    } catch (e) {
+      return null;
+    }
+  }));
+  if (run !== tagsRun || state.view !== 'tags' || state.tagId !== tag.id) return;
+
+  const categoryById = new Map(state.categories.map(c => [c.id, c]));
+  const found = decrypted.filter(f => f && categoryById.has(f.entry.categoryId));
+  const emptyText = 'No items have this tag yet.';
+  const byTitle = (a, b) => a.entry.title.localeCompare(b.entry.title);
+
+  if (state.tagSort === 'By category') {
+    const groups = [];
+    for (const category of state.categories) {
+      const cards = found
+        .filter(f => f.entry.categoryId === category.id)
+        .sort(byTitle)
+        .map(f => cardFor(f, category));
+      if (cards.length) groups.push({ category, cards });
+    }
+    renderFavoriteGroups(content, { groups, hasCategories: true, emptyText });
+    return;
+  }
+
+  const byUpdated = (a, b) => (b.entry.updatedAt || '').localeCompare(a.entry.updatedAt || '');
+  const sorted = [...found].sort(state.tagSort === 'Recently updated' ? byUpdated : byTitle);
+  renderCardGrid(content, sorted.map(f => cardFor(f, categoryById.get(f.entry.categoryId))), emptyText);
+}
+
+function closeTagModal() {
+  el.tagModalBackdrop.style.display = 'none';
+}
+
+function openTagModal(tag = null) {
+  el.tagModalTitle.textContent = tag ? 'Rename tag' : 'New tag';
+  el.tagModalBody.innerHTML = '';
+
+  const field = document.createElement('div');
+  field.className = 'field';
+  const label = document.createElement('label');
+  label.className = 'field-label';
+  label.textContent = 'Name';
+  const input = document.createElement('input');
+  input.className = 'input';
+  input.maxLength = 32;
+  input.value = tag ? tag.name : '';
+  input.placeholder = 'e.g. Work';
+  field.appendChild(label);
+  field.appendChild(input);
+  el.tagModalBody.appendChild(field);
+
+  const errorEl = document.createElement('div');
+  errorEl.className = 'error-text';
+  errorEl.style.display = 'none';
+  el.tagModalBody.appendChild(errorEl);
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  actions.innerHTML = `
+    <div class="modal-spacer"></div>
+    <button class="btn btn-ghost" id="tag-cancel">Cancel</button>
+    <button class="btn btn-primary" id="tag-save"></button>
+  `;
+  el.tagModalBody.appendChild(actions);
+  const saveBtn = actions.querySelector('#tag-save');
+  saveBtn.textContent = tag ? 'Save' : 'Create';
+
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+  };
+
+  const save = async () => {
+    const name = input.value.trim();
+    if (!name) return showError('Give the tag a name.');
+    const clash = state.tags.find(t => t.id !== tag?.id && t.name.toLowerCase() === name.toLowerCase());
+    if (clash) return showError('A tag with that name already exists.');
+
+    saveBtn.disabled = true;
+    try {
+      if (tag) {
+        const updated = await withSessionGuard(() => renameTag({ id: tag.id, name }));
+        if (updated === null) return;
+        tag.name = updated.name;
+      } else {
+        const created = await withSessionGuard(() => createTag({ id: newTagId(), name }));
+        if (created === null) return;
+        state.tags.push(created);
+      }
+      sortTags();
+      closeTagModal();
+      await renderTags();
+    } catch (err) {
+      showError(err.status === 409 ? 'A tag with that name already exists.' : err.message);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  };
+
+  actions.querySelector('#tag-cancel').addEventListener('click', closeTagModal);
+  saveBtn.addEventListener('click', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      save();
+    }
+  });
+
+  el.tagModalBackdrop.style.display = 'flex';
+  input.focus();
+}
+
+async function deleteTagFlow(tag) {
+  if (!confirm(`Delete the tag "${tag.name}"? It will be removed from every item that has it.`)) return;
+  const done = await withSessionGuard(() => deleteTag(tag.id));
+  if (done === null) return;
+  state.tags = state.tags.filter(t => t.id !== tag.id);
+  if (state.tagId === tag.id) state.tagId = null;
+  await renderTags();
+}
+
+function openTagPickerFor(item, data, anchor, onChange) {
+  let changed = false;
+  const notify = () => {
+    changed = true;
+    onChange();
+  };
+
+  openTagPicker(anchor, {
+    tags: state.tags,
+    selectedIds: new Set(liveTagIds(data.tags)),
+    onToggle: async (tagId, on) => {
+      const current = liveTagIds(data.tags).filter(id => id !== tagId);
+      const next = on ? [...current, tagId] : current;
+      if (!(await setItemTags(item, data, next))) throw new Error('Could not save this change.');
+      notify();
+    },
+    onCreate: async (name) => {
+      const tag = await ensureTag(name);
+      const current = liveTagIds(data.tags);
+      if (!current.includes(tag.id)) {
+        if (!(await setItemTags(item, data, [...current, tag.id]))) throw new Error('Could not save this change.');
+        notify();
+      }
+      return tag;
+    },
+    onClose: () => {
+      if (changed && state.view === 'tags' && state.tagId) renderTags();
+    },
+  });
+}
+
+function openTagListFor(item, data, anchor, onChange) {
+  let changed = false;
+
+  openTagList(anchor, {
+    tags: resolveTags(data),
+    onOpenTag: (tag) => openTag(tag.id),
+    onRemove: async (tag) => {
+      const next = liveTagIds(data.tags).filter(id => id !== tag.id);
+      if (!(await setItemTags(item, data, next))) throw new Error('Could not save this change.');
+      changed = true;
+      onChange();
+    },
+    onClose: () => {
+      if (changed && state.view === 'tags' && state.tagId) renderTags();
+    },
+  });
 }
 
 function updateTopbar() {
   const category = activeCategory();
-  if (state.view === 'home') el.topbarTitle.textContent = 'Home';
-  else if (state.view === 'tags') el.topbarTitle.textContent = 'Tags';
-  else el.topbarTitle.textContent = category ? category.name : 'WayStone';
+  if (state.view === 'home') {
+    el.topbarTitle.textContent = 'Home';
+  } else if (state.view === 'tags') {
+    const tag = state.tags.find(t => t.id === state.tagId);
+    el.topbarTitle.textContent = tag ? `Tags / ${tag.name}` : 'Tags';
+  } else {
+    el.topbarTitle.textContent = category ? category.name : 'WayStone';
+  }
 }
 
 function updateAddItemAvailability() {
   const inCategory = state.view === 'category' && !!state.activeCategoryId;
   el.addItemBtn.classList.toggle('hidden', !inCategory);
   el.editSchemaBtn.classList.toggle('hidden', !inCategory);
+  el.addTagBtn.classList.toggle('hidden', state.view !== 'tags');
 }
 
 async function selectView(view) {
   state.searchQuery = '';
+  state.tagId = null;
   state.view = view;
   state.activeCategoryId = null;
   renderNav();
@@ -310,6 +593,7 @@ async function selectView(view) {
 
 async function selectCategory(id) {
   state.searchQuery = '';
+  state.tagId = null;
   state.view = 'category';
   state.activeCategoryId = id;
   renderNav();
@@ -390,6 +674,12 @@ function buildCard(item, category, data) {
     onConsumeBackupCode: (row, field, codes) => consumeBackupCode(row, data, field, codes),
   });
   attachFavoriteButton(card, data.favorite === true, () => toggleFavorite(item, data));
+  const area = attachTagArea(card, {
+    getTags: () => resolveTags(data),
+    onOpenPicker: (anchor) => openTagPickerFor(item, data, anchor, () => area?.refresh()),
+    onShowAll: (anchor) => openTagListFor(item, data, anchor, () => area?.refresh()),
+    onChipClick: (tag) => openTag(tag.id),
+  });
   return { card, dispose };
 }
 
@@ -447,28 +737,51 @@ async function consumeBackupCode(item, data, field, codes) {
   return remaining;
 }
 
+async function saveItemData(item, data) {
+  const enc = await encryptItemData(data);
+  const saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
+  if (!saved) return false;
+  item.updatedAt = saved.updatedAt;
+  syncIndex(item, enc, data);
+  return true;
+}
+
+async function handleSaveConflict(err, message) {
+  if (err.status !== 409) throw err;
+  alert(message);
+  await reloadCurrentView();
+  refreshIndex();
+}
+
 async function toggleFavorite(item, data) {
   const previous = data.favorite === true;
   data.favorite = !previous;
   try {
-    const enc = await encryptItemData(data);
-    const saved = await withSessionGuard(() => saveItem({ id: item.id, categoryId: item.categoryId, expectedUpdatedAt: item.updatedAt, ...enc }));
-    if (!saved) {
+    if (!(await saveItemData(item, data))) {
       data.favorite = previous;
       return previous;
     }
-    item.updatedAt = saved.updatedAt;
-    syncIndex(item, enc, data);
   } catch (err) {
     data.favorite = previous;
-    if (err.status !== 409) throw err;
-    alert('This item was changed elsewhere and has been reloaded.');
-    await reloadCurrentView();
-    refreshIndex();
+    await handleSaveConflict(err, 'This item was changed elsewhere and has been reloaded.');
     return previous;
   }
   if (state.view === 'home') renderHome();
   return data.favorite;
+}
+
+async function setItemTags(item, data, ids) {
+  const previous = data.tags;
+  data.tags = ids;
+  try {
+    if (await saveItemData(item, data)) return true;
+  } catch (err) {
+    data.tags = previous;
+    await handleSaveConflict(err, 'This item was changed elsewhere and has been reloaded.');
+    return false;
+  }
+  data.tags = previous;
+  return false;
 }
 
 function fieldInput(field, value) {
@@ -574,6 +887,7 @@ function openEditor(item, data, category = activeCategory()) {
         subtitle: (subtitleFieldDef && fieldValues[subtitleFieldDef.id]) || '',
         fields: fieldValues,
         favorite: favoriteInput.checked,
+        tags: liveTagIds(data.tags),
       };
       const enc = await encryptItemData(newData);
       let saved;
@@ -954,7 +1268,7 @@ async function openSettingsModal() {
     </div>
     <div class="danger-zone" style="margin-top:20px">
       <h3 style="margin-bottom:8px">Danger zone</h3>
-      <p class="hint" style="margin-bottom:12px">Deletes every category and every item. Cannot be undone.</p>
+      <p class="hint" style="margin-bottom:12px">Deletes every category, item and tag. Cannot be undone.</p>
       <button class="btn btn-danger" id="settings-wipe-btn">Delete all data</button>
     </div>
   `;
@@ -1089,7 +1403,7 @@ function wireSettingsData() {
   document.getElementById('settings-export-btn').addEventListener('click', async () => {
     try {
       const allItems = await fetchItems();
-      const bundle = { exportedAt: new Date().toISOString(), categories: state.categories, items: [] };
+      const bundle = { exportedAt: new Date().toISOString(), categories: state.categories, tags: state.tags, items: [] };
       for (const item of allItems) {
         const data = await decryptItemData(item);
         bundle.items.push({ id: item.id, categoryId: item.categoryId, data });
@@ -1116,14 +1430,36 @@ function wireSettingsData() {
       const bundle = JSON.parse(text);
       if (!Array.isArray(bundle.items)) throw new Error('File does not look like a WayStone export');
 
+      const categoryIds = new Set(state.categories.map(c => c.id));
+      for (const category of bundle.categories || []) {
+        if (categoryIds.has(category.id)) continue;
+        try {
+          const created = await createCategory({ id: category.id, name: category.name, icon: category.icon || '', sortOrder: state.categories.length, fields: category.fields || [] });
+          state.categories.push(created);
+          categoryIds.add(created.id);
+        } catch (e) {}
+      }
+
+      const tagIdMap = new Map();
+      for (const tag of bundle.tags || []) {
+        try {
+          tagIdMap.set(tag.id, (await ensureTag(tag.name)).id);
+        } catch (e) {}
+      }
+
       let imported = 0;
+      let skipped = 0;
       for (const entry of bundle.items) {
-        if (!entry.categoryId || !state.categories.find(c => c.id === entry.categoryId)) continue;
-        const enc = await encryptItemData(entry.data);
+        if (!entry.categoryId || !categoryIds.has(entry.categoryId)) {
+          skipped++;
+          continue;
+        }
+        const data = { ...entry.data, tags: (entry.data.tags || []).map(id => tagIdMap.get(id)).filter(Boolean) };
+        const enc = await encryptItemData(data);
         await createItem({ id: crypto.randomUUID(), categoryId: entry.categoryId, ...enc });
         imported++;
       }
-      alert(`Imported ${imported} item(s). Categories referenced by the file that no longer exist were skipped.`);
+      alert(`Imported ${imported} item(s).` + (skipped ? ` ${skipped} skipped because their category could not be restored.` : ''));
       await loadCategories();
       refreshIndex();
     } catch (err) {
@@ -1134,10 +1470,13 @@ function wireSettingsData() {
   });
 
   document.getElementById('settings-wipe-btn').addEventListener('click', async () => {
-    if (!confirm('This deletes every category and item permanently. There is no undo. Continue?')) return;
+    if (!confirm('This deletes every category, item and tag permanently. There is no undo. Continue?')) return;
     for (const category of state.categories) {
       await withSessionGuard(() => deleteCategory(category.id));
     }
+    for (const tag of state.tags) await withSessionGuard(() => deleteTag(tag.id));
+    state.tags = [];
+    state.tagId = null;
     state.activeCategoryId = null;
     replaceIndex([]);
     await loadCategories();
@@ -1205,6 +1544,8 @@ el.addItemBtn?.addEventListener('click', () => {
 });
 
 el.addCategoryBtn?.addEventListener('click', () => openCategoryModal());
+el.addTagBtn?.addEventListener('click', () => openTagModal());
+el.tagModalClose.addEventListener('click', closeTagModal);
 
 function openCategoryModal() {
   el.categoryModalBody.innerHTML = '';
