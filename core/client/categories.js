@@ -122,6 +122,10 @@ function newFieldId() {
   return 'f' + Math.random().toString(36).slice(2, 8);
 }
 
+function newOptionId() {
+  return 'o' + Math.random().toString(36).slice(2, 10);
+}
+
 function newTagId() {
   return 't' + Math.random().toString(36).slice(2, 10);
 }
@@ -130,8 +134,8 @@ function newCategoryId() {
   return 'c' + Math.random().toString(36).slice(2, 10);
 }
 
-const FIELD_TYPES = ['text', 'integer', 'rich-text', 'secret'];
-const SECRET_SUBTYPES = ['password', 'totp', 'backup-codes'];
+const FIELD_TYPES = ['text', 'email', 'service', 'integer', 'rich-text', 'secret'];
+const SECRET_SUBTYPES = ['password', 'multiline', 'totp', 'backup-codes'];
 
 /**
  * An item's card title and subtitle are the first two non-secret schema
@@ -145,4 +149,4 @@ function pickTitleFields(fields) {
   return { titleField, subtitleField };
 }
 
-export { renderSidebarList, setReorderHandler, attachEmojiInput, newFieldId, newCategoryId, newTagId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
+export { renderSidebarList, setReorderHandler, attachEmojiInput, newFieldId, newCategoryId, newTagId, newOptionId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
