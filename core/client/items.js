@@ -68,8 +68,8 @@ function fieldRow(label, valueEl, actionEl = null) {
  * Plain text/integer/rich-text field row. `truncateValue` is used for the
  * compact card body (12 chars + "…"); the View modal calls this with it
  * left off to show the full value. A field marked `copyable` in its schema
- * (see categories.js schema editor) gets a copy button regardless of which
- * mode this is rendered in — the button always copies the untruncated value.
+ * gets a copy button in either mode, and the button always copies the
+ * untruncated value.
  */
 function renderTextRow(field, value, { truncateValue = false } = {}) {
   const displayValue = truncateValue ? truncateStr(value) : (value ?? '');
@@ -195,13 +195,9 @@ function renderFieldRow(field, value, disposers, onConsumeBackupCode) {
   return renderTextRow(field, value);
 }
 
-/* ── Hero renderers ───────────────────────────────────────────────────────
-   The card's FIRST secret field (in schema order) becomes the "featured"
-   field and drives the card's whole visual treatment — a TOTP-first card
-   reads like an authenticator entry, a backup-codes card leads with how
-   many codes are left, a password-first card leads with a big reveal row.
-   Every other field on the item still renders as a normal row underneath.
-   ────────────────────────────────────────────────────────────────────── */
+/* The card's FIRST secret field (in schema order) becomes the "featured"
+   field and drives the card's whole visual treatment. Every other field on
+   the item still renders as a normal row underneath. */
 
 function renderTotpHero(field, secret, disposers) {
   const block = document.createElement('div');
@@ -330,8 +326,8 @@ function createItemCard(item, category, data, callbacks = {}) {
   const featuredSubtype = featured?.subtype || 'password';
 
   // The compact card body shows at most 3 fields: the first 3 non-secret
-  // fields in schema order. Anything beyond that — including every other
-  // secret field — is still on the item, just only visible via View.
+  // fields in schema order. Anything beyond that, including every other
+  // secret field, is only visible via View.
   const bodyFields = fields.filter(f => f.type !== 'secret').slice(0, 3);
 
   const card = document.createElement('div');
@@ -352,11 +348,6 @@ function createItemCard(item, category, data, callbacks = {}) {
   `;
   head.querySelector('.item-card-title').textContent = data.title || 'Untitled';
   head.querySelector('.item-card-sub').textContent = data.subtitle || '';
-
-  const categoryBadge = document.createElement('span');
-  categoryBadge.className = 'badge';
-  categoryBadge.textContent = category?.name || '';
-  head.querySelector('.item-card-badges').appendChild(categoryBadge);
 
   card.appendChild(head);
 
