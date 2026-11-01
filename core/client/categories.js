@@ -122,6 +122,10 @@ function newFieldId() {
   return 'f' + Math.random().toString(36).slice(2, 8);
 }
 
+function newTagId() {
+  return 't' + Math.random().toString(36).slice(2, 10);
+}
+
 function newCategoryId() {
   return 'c' + Math.random().toString(36).slice(2, 10);
 }
@@ -141,4 +145,4 @@ function pickTitleFields(fields) {
   return { titleField, subtitleField };
 }
 
-export { renderSidebarList, setReorderHandler, attachEmojiInput, newFieldId, newCategoryId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
+export { renderSidebarList, setReorderHandler, attachEmojiInput, newFieldId, newCategoryId, newTagId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields };
