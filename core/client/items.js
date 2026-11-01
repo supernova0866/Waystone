@@ -127,6 +127,44 @@ function renderSecretPasswordRow(field, value) {
   return fieldRow(field.name, wrap);
 }
 
+function renderSecretMultilineRow(field, value) {
+  const wrap = document.createElement('span');
+  wrap.className = 'secret-value';
+
+  const block = document.createElement('span');
+  block.className = 'secret-dots multiline';
+  block.textContent = '••••••••••••';
+  block.dataset.revealed = '0';
+
+  const actions = document.createElement('span');
+  actions.className = 'secret-actions';
+
+  const revealBtn = document.createElement('button');
+  revealBtn.className = 'btn btn-icon';
+  revealBtn.title = 'Reveal';
+  revealBtn.textContent = '👁';
+  revealBtn.addEventListener('click', () => {
+    const revealed = block.dataset.revealed === '1';
+    block.textContent = revealed ? '••••••••••••' : (value ?? '');
+    block.classList.toggle('revealed', !revealed);
+    block.dataset.revealed = revealed ? '0' : '1';
+    revealBtn.textContent = revealed ? '👁' : '🙈';
+  });
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-icon';
+  copyBtn.title = 'Copy';
+  copyBtn.textContent = '⧉';
+  copyBtn.addEventListener('click', () => { copyText(value ?? ''); flashCopied(copyBtn); });
+
+  actions.appendChild(revealBtn);
+  actions.appendChild(copyBtn);
+  wrap.appendChild(block);
+  wrap.appendChild(actions);
+
+  return fieldRow(field.name, wrap);
+}
+
 function renderTotpRow(field, secret, disposers) {
   const codeEl = document.createElement('span');
   codeEl.className = 'mono item-card-row-value';
@@ -190,6 +228,7 @@ function renderFieldRow(field, value, disposers, onConsumeBackupCode) {
   if (field.type === 'secret') {
     if (field.subtype === 'totp') return renderTotpRow(field, value, disposers);
     if (field.subtype === 'backup-codes') return renderBackupCodesRow(field, value, onConsumeBackupCode);
+    if (field.subtype === 'multiline') return renderSecretMultilineRow(field, value);
     return renderSecretPasswordRow(field, value);
   }
   return renderTextRow(field, value);
@@ -317,6 +356,7 @@ const TYPE_BADGE = {
   totp: { cls: 'badge-totp', label: '⏱ TOTP' },
   'backup-codes': { cls: 'badge-secret', label: '🔑 Backup' },
   password: { cls: 'badge-secret', label: '● Password' },
+  multiline: { cls: 'badge-secret', label: '▤ Multiline' },
 };
 
 function createItemCard(item, category, data, callbacks = {}) {
