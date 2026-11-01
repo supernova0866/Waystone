@@ -85,6 +85,18 @@ function favoriteEntries() {
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
+function tagCounts() {
+  const counts = new Map();
+  for (const entry of entries.values()) {
+    for (const id of entry.tags) counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return counts;
+}
+
+function entriesWithTag(tagId) {
+  return [...entries.values()].filter(entry => entry.tags.includes(tagId));
+}
+
 function searchIndex(query, limit = 50) {
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!tokens.length) return { results: [], total: 0 };
@@ -106,4 +118,4 @@ function searchIndex(query, limit = 50) {
   return { results: matches.slice(0, limit).map(m => m.entry), total: matches.length };
 }
 
-export { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex };
+export { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex, tagCounts, entriesWithTag };
