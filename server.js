@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url';
 import argon2 from 'argon2';
 
 import { getClient } from './core/db/turso-client.js';
-import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable, ensureTagsTable } from './core/db/schema.js';
+import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable, ensureTagsTable, ensureOptionsTable } from './core/db/schema.js';
 import { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories } from './core/db/categories.js';
 import { ConflictError, createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
 import { TagConflictError, TagNotFoundError, loadTags, createTag, renameTag, deleteTag } from './core/db/tags.js';
+import { OptionConflictError, normalizeOption, loadOptions, createOption, deleteOption } from './core/db/options.js';
 import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
 import { checkRateLimit } from './core/auth/rate-limit.js';
 import {
@@ -292,6 +293,36 @@ async function handleTags(req, res, url) {
   sendJson(res, 405, { error: 'Method not allowed' });
 }
 
+async function handleOptions(req, res, url) {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const client = getClient();
+
+  if (req.method === 'GET') return sendJson(res, 200, await loadOptions(client, user.id));
+
+  if (req.method === 'DELETE') {
+    const id = url.searchParams.get('id');
+    if (!id) return sendJson(res, 400, { error: 'Missing id' });
+    await deleteOption(client, user.id, id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    if (typeof body.id !== 'string' || !body.id) return sendJson(res, 400, { error: 'Missing id' });
+    const value = normalizeOption(body.kind, body.value);
+    if (!value) return sendJson(res, 400, { error: 'Invalid entry' });
+    try {
+      return sendJson(res, 200, await createOption(client, user.id, { id: body.id, kind: body.kind, value }));
+    } catch (e) {
+      if (e instanceof OptionConflictError) return sendJson(res, 409, { error: e.message });
+      throw e;
+    }
+  }
+
+  sendJson(res, 405, { error: 'Method not allowed' });
+}
+
 async function handleItems(req, res, url) {
   const user = await requireUser(req, res);
   if (!user) return;
@@ -376,6 +407,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/categories/order') return await handleCategoryOrder(req, res);
     if (pathname === '/api/categories') return await handleCategories(req, res, url);
     if (pathname === '/api/tags') return await handleTags(req, res, url);
+    if (pathname === '/api/options') return await handleOptions(req, res, url);
     if (pathname === '/api/items') return await handleItems(req, res, url);
 
     if (LEGACY_REDIRECTS[pathname]) return redirect(res, LEGACY_REDIRECTS[pathname]);
@@ -419,6 +451,7 @@ async function boot() {
     await ensureCategoriesTable(client);
     await ensureItemsTable(client);
     await ensureTagsTable(client);
+    await ensureOptionsTable(client);
     console.log('Tables ready.');
 
     if (process.env.SEED_ADMIN_USERNAME && process.env.SEED_ADMIN_PASSWORD_HASH && process.env.SEED_ADMIN_SALT) {
