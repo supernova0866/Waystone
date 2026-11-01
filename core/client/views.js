@@ -69,36 +69,56 @@ function hintLine(className, text) {
   return p;
 }
 
-function renderHomeView(container, { categories, loginCount, commit, stats, query, onSearch }) {
+function renderFilterChips(chipsEl, filters, onRemove) {
+  chipsEl.innerHTML = '';
+  filters.forEach((filter, index) => {
+    const chip = document.createElement('span');
+    chip.className = 'search-chip';
+    chip.appendChild(document.createTextNode(`${filter.kind}: ${filter.value}`));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.title = 'Remove filter';
+    remove.textContent = '✕';
+    remove.addEventListener('click', () => onRemove(index));
+    chip.appendChild(remove);
+    chipsEl.appendChild(chip);
+  });
+}
+
+function renderHomeView(container, { categories, loginCount, commit, stats, query, filters, onSearch, onRemoveFilter }) {
   container.innerHTML = '';
 
   const home = document.createElement('div');
   home.className = 'home';
 
+  const searchBox = document.createElement('div');
+  searchBox.className = 'home-search-box';
+  searchBox.title = 'Secrets are never searched';
+  const chipsEl = document.createElement('span');
+  chipsEl.className = 'search-chips';
   const searchInput = document.createElement('input');
-  searchInput.className = 'input home-search';
-  searchInput.type = 'search';
-  searchInput.placeholder = 'Search titles and fields — secrets are never searched';
-  searchInput.autocomplete = 'off';
+  searchInput.className = 'home-search-input';
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search, or filter with service: email: tag:';
   searchInput.value = query || '';
   searchInput.addEventListener('input', () => onSearch(searchInput.value));
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && searchInput.value) {
-      searchInput.value = '';
-      onSearch('');
-    }
-  });
-  home.appendChild(searchInput);
+  searchBox.appendChild(chipsEl);
+  searchBox.appendChild(searchInput);
+  home.appendChild(searchBox);
+
+  const refreshChips = () => renderFilterChips(chipsEl, filters, onRemoveFilter);
+  refreshChips();
 
   const bodyEl = document.createElement('div');
   bodyEl.className = 'home-body';
 
   const grid = document.createElement('div');
   grid.className = 'home-stats';
-  const total = stats ? stats.password + stats.totp + stats['backup-codes'] : '…';
+  const total = stats ? Object.values(stats).reduce((sum, n) => sum + n, 0) : '…';
   grid.appendChild(statCard('Categories', categories.length));
   grid.appendChild(statCard('Saved secrets', total, stats && [
     ['Passwords', stats.password],
+    ['Multiline', stats.multiline],
     ['TOTP', stats.totp],
     ['Backup codes', stats['backup-codes']],
   ]));
@@ -122,13 +142,13 @@ function renderHomeView(container, { categories, loginCount, commit, stats, quer
 
   container.appendChild(home);
 
-  if (query) {
+  if (query || filters.length) {
     searchInput.focus();
     const end = searchInput.value.length;
     searchInput.setSelectionRange?.(end, end);
   }
 
-  return { bodyEl, favoritesEl, resultsEl };
+  return { bodyEl, favoritesEl, resultsEl, searchBox, searchInput, refreshChips };
 }
 
 function renderFavoriteGroups(container, { loading = false, groups = [], hasCategories = true, emptyText = null }) {
