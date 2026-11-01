@@ -90,6 +90,18 @@ async function deleteTag(tagId) {
   return request(`/api/tags?id=${encodeURIComponent(tagId)}`, { method: 'DELETE' });
 }
 
+async function fetchOptions() {
+  return request('/api/options', { method: 'GET' });
+}
+
+async function createOption(option) {
+  return request('/api/options', { method: 'POST', body: JSON.stringify(option) });
+}
+
+async function deleteOption(optionId) {
+  return request(`/api/options?id=${encodeURIComponent(optionId)}`, { method: 'DELETE' });
+}
+
 async function fetchItems(categoryId = null) {
   const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : '';
   return request(`/api/items${qs}`, { method: 'GET' });
@@ -126,6 +138,9 @@ export {
   createTag,
   renameTag,
   deleteTag,
+  fetchOptions,
+  createOption,
+  deleteOption,
   fetchItems,
   createItem,
   saveItem,
