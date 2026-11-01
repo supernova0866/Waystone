@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/style/sidebar-order.css" />
 <link rel="stylesheet" href="/style/home.css" />
 <link rel="stylesheet" href="/style/emoji-input.css" />
+<link rel="stylesheet" href="/style/tags.css" />
 
 <style>
   body { display: flex; height: 100vh; overflow: hidden; }
@@ -95,6 +96,7 @@
       <div class="topbar-actions">
         <button class="btn btn-ghost btn-sm" id="edit-schema-btn">⚙ Edit Schema</button>
         <button class="btn btn-primary btn-sm" id="add-item-btn">+ New item</button>
+        <button class="btn btn-primary btn-sm hidden" id="add-tag-btn">+ New tag</button>
       </div>
     </div>
     <div class="main-scroll">
@@ -140,6 +142,16 @@
       <button class="btn btn-icon btn-ghost" id="category-modal-close">✕</button>
     </div>
     <div id="category-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="tag-modal-backdrop" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="tag-modal-title">New tag</h2>
+      <button class="btn btn-icon btn-ghost" id="tag-modal-close">✕</button>
+    </div>
+    <div id="tag-modal-body"></div>
   </div>
 </div>
 
