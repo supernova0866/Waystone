@@ -63,4 +63,20 @@ async function ensureItemsTable(client) {
   }
 }
 
-export { ensureUsersTable, ensureCategoriesTable, ensureItemsTable };
+async function ensureTagsTable(client) {
+  const sqls = [
+    `CREATE TABLE IF NOT EXISTS tags (
+       id TEXT PRIMARY KEY,
+       user_id TEXT NOT NULL,
+       name TEXT NOT NULL COLLATE NOCASE,
+       created_at TEXT
+     )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_user_name ON tags(user_id, name)`,
+  ];
+  for (const sql of sqls) {
+    const { error } = await tursoQuery(client.url, client.token, sql, []);
+    if (error) throw new Error(error);
+  }
+}
+
+export { ensureUsersTable, ensureCategoriesTable, ensureItemsTable, ensureTagsTable };
