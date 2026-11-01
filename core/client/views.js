@@ -27,18 +27,6 @@ function renderPinnedList(container, activeView, onSelect) {
   }
 }
 
-function renderMessage(container, icon, text) {
-  container.innerHTML = '';
-  const empty = document.createElement('div');
-  empty.className = 'empty-state';
-  const iconEl = document.createElement('div');
-  iconEl.className = 'es-icon';
-  iconEl.textContent = icon;
-  empty.appendChild(iconEl);
-  empty.appendChild(document.createTextNode(text));
-  container.appendChild(empty);
-}
-
 function statCard(label, value, breakdown = null) {
   const card = document.createElement('div');
   card.className = 'stat-card';
@@ -143,14 +131,14 @@ function renderHomeView(container, { categories, loginCount, commit, stats, quer
   return { bodyEl, favoritesEl, resultsEl };
 }
 
-function renderFavoriteGroups(container, { loading = false, groups = [], hasCategories = true }) {
+function renderFavoriteGroups(container, { loading = false, groups = [], hasCategories = true, emptyText = null }) {
   container.innerHTML = '';
 
   if (loading || !groups.length) {
     const text = loading
       ? 'Loading favorites…'
       : hasCategories
-        ? 'Star an item to pin it here.'
+        ? (emptyText || 'Star an item to pin it here.')
         : 'No categories yet — create one to get started.';
     container.appendChild(hintLine('hint', text));
     return;
@@ -283,8 +271,4 @@ function attachFavoriteButton(card, isFavorite, onToggle) {
   footer.insertBefore(btn, footer.firstChild);
 }
 
-function renderTagsPlaceholder(container) {
-  renderMessage(container, '🏷', 'Tags will live here.');
-}
-
-export { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton, renderTagsPlaceholder };
+export { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton };
