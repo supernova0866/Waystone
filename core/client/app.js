@@ -1,10 +1,12 @@
-import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, fetchTags, createTag, renameTag, deleteTag, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
+import { checkSession, login, logout, fetchCategories, createCategory, saveCategory, reorderCategories, deleteCategory, fetchItems, createItem, saveItem, deleteItem, fetchTags, createTag, renameTag, deleteTag, fetchOptions, createOption, deleteOption, createInvite, listUsers, changePassword, getAuthSalt } from '/core/client/api.js';
 import { unlockVault, deriveVaultKey, installVaultKey, lockVault, isUnlocked, encryptItemData, encryptItemDataWithKey, decryptItemData, deriveAuthProof } from '/core/client/crypto.js';
 import { createItemCard, renderFieldRow } from '/core/client/items.js';
-import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newTagId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
+import { renderSidebarList, setReorderHandler, attachEmojiInput, newCategoryId, newTagId, newOptionId, newFieldId, FIELD_TYPES, SECRET_SUBTYPES, pickTitleFields } from '/core/client/categories.js';
 import { renderPinnedList, renderHomeView, renderFavoriteGroups, renderSearchResults, attachFavoriteButton } from '/core/client/views.js';
 import { TAG_SORTS, closePopover, attachTagArea, openTagPicker, openTagList, renderTagList, renderTagDetailShell, renderCardGrid } from '/core/client/tags-ui.js';
-import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex, tagCounts, entriesWithTag } from '/core/client/vault-index.js';
+import { attachAutofill, closeAutofill } from '/core/client/autofill.js';
+import { DEFAULT_SERVICES, DEFAULT_EMAIL_PROVIDERS, normalizeProvider, normalizeService, mergeProviders, mergeServices, canonicalService, suggestKnown, suggestServices, suggestEmails } from '/core/client/options.js';
+import { buildEntry, replaceIndex, upsertIndex, removeFromIndex, removeCategoryFromIndex, clearIndex, isIndexReady, secretStats, favoriteEntries, searchIndex, tagCounts, entriesWithTag, knownEmails, knownServices } from '/core/client/vault-index.js';
 import { buildIsel } from '/core/client/isel.js';
 import { parseBackupCodes, consumeCode } from '/core/client/backup-codes.js';
 import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/core/client/particles.js';
@@ -15,6 +17,8 @@ const state = {
   loginCount: 0,
   commit: '',
   searchQuery: '',
+  searchFilters: [],
+  options: [],
   tags: [],
   tagsLoaded: false,
   tagId: null,
@@ -99,6 +103,8 @@ function resetState() {
   homeRun++;
   tagsRun++;
   state.searchQuery = '';
+  state.searchFilters = [];
+  state.options = [];
   state.tags = [];
   state.tagsLoaded = false;
   state.tagId = null;
@@ -112,7 +118,7 @@ function resetState() {
 async function showApp() {
   hideAllGates();
   el.app.style.display = '';
-  await loadTags();
+  await Promise.all([loadTags(), loadOptions()]);
   await loadCategories();
   refreshIndex();
 
@@ -229,11 +235,18 @@ async function renderHome() {
     commit: state.commit,
     stats: isIndexReady() ? secretStats() : null,
     query: state.searchQuery,
+    filters: state.searchFilters,
     onSearch: (query) => {
       state.searchQuery = query;
       applySearch(refs);
     },
+    onRemoveFilter: (index) => {
+      state.searchFilters.splice(index, 1);
+      applySearch(refs);
+      refs.searchInput.focus();
+    },
   });
+  wireSearchBox(refs);
   applySearch(refs);
 
   if (!isIndexReady()) {
@@ -264,16 +277,112 @@ async function renderHome() {
   renderFavoriteGroups(refs.favoritesEl, { groups, hasCategories: state.categories.length > 0 });
 }
 
+function parsePending(text) {
+  const match = String(text || '').match(/^\s*(service|email|tag):\s*(.*)$/i);
+  return match ? { kind: match[1].toLowerCase(), value: match[2].trim() } : null;
+}
+
+function customValues(kind) {
+  return state.options.filter(o => o.kind === kind).map(o => o.value);
+}
+
+function allServices() {
+  return mergeServices({ known: knownServices(), custom: customValues('service') });
+}
+
+function allProviders() {
+  return mergeProviders({ custom: customValues('email-provider') });
+}
+
+function filterChoices(kind) {
+  if (kind === 'service') return allServices();
+  if (kind === 'email') return knownEmails();
+  return state.tags.map(t => t.name);
+}
+
+function searchSuggestions(value) {
+  const pending = parsePending(value);
+  return pending ? suggestKnown(pending.value, filterChoices(pending.kind), { allowEmpty: true }) : [];
+}
+
+function resolveFilterValue(kind, typed) {
+  const clean = typed.trim();
+  const choices = filterChoices(kind);
+  const exact = choices.find(choice => choice.toLowerCase() === clean.toLowerCase());
+  return exact || suggestKnown(clean, choices)[0] || clean;
+}
+
+function commitFilter(refs, kind, value) {
+  const clean = String(value || '').trim();
+  if (!clean) return false;
+
+  let filter;
+  if (kind === 'tag') {
+    const tag = state.tags.find(t => t.name.toLowerCase() === clean.toLowerCase());
+    if (!tag) return false;
+    filter = { kind, value: tag.name, tagId: tag.id };
+  } else if (kind === 'service') {
+    filter = { kind, value: canonicalService(clean, allServices()) };
+  } else {
+    filter = { kind, value: clean };
+  }
+
+  const exists = state.searchFilters.some(f => f.kind === filter.kind && f.value.toLowerCase() === filter.value.toLowerCase());
+  if (!exists) state.searchFilters.push(filter);
+  state.searchQuery = '';
+  refs.searchInput.value = '';
+  closeAutofill();
+  applySearch(refs);
+  return true;
+}
+
+function wireSearchBox(refs) {
+  const input = refs.searchInput;
+
+  attachAutofill(input, {
+    anchor: refs.searchBox,
+    getSuggestions: searchSuggestions,
+    onPick: (suggestion) => {
+      const pending = parsePending(input.value);
+      if (pending) commitFilter(refs, pending.kind, suggestion);
+    },
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const pending = parsePending(input.value);
+      if (pending && commitFilter(refs, pending.kind, resolveFilterValue(pending.kind, pending.value))) e.preventDefault();
+    } else if (e.key === 'Backspace' && input.value === '' && state.searchFilters.length) {
+      state.searchFilters.pop();
+      applySearch(refs);
+    } else if (e.key === 'Escape' && (input.value || state.searchFilters.length)) {
+      input.value = '';
+      state.searchQuery = '';
+      state.searchFilters.length = 0;
+      applySearch(refs);
+    }
+  });
+}
+
 function applySearch(refs) {
-  const query = state.searchQuery.trim();
-  refs.bodyEl.classList.toggle('hidden', !!query);
-  refs.resultsEl.classList.toggle('hidden', !query);
-  if (!query) return;
+  refs.refreshChips();
+
+  const pending = parsePending(state.searchQuery);
+  const text = pending ? '' : state.searchQuery.trim();
+  const filters = state.searchFilters.map(f => ({ ...f, exact: true }));
+  if (pending && pending.value) filters.push({ kind: pending.kind, value: pending.value, exact: false });
+
+  const searching = !!(text || filters.length);
+  refs.bodyEl.classList.toggle('hidden', searching);
+  refs.resultsEl.classList.toggle('hidden', !searching);
+  if (!searching) return;
 
   const ready = isIndexReady();
-  const { results, total } = ready ? searchIndex(query) : { results: [], total: 0 };
+  const tagNames = new Map(state.tags.map(t => [t.id, t.name]));
+  const { results, total } = ready ? searchIndex(text, { filters, tagNames }) : { results: [], total: 0 };
+  const label = [...filters.map(f => `${f.kind}:${f.value}`), text].filter(Boolean).join(' ');
   renderSearchResults(refs.resultsEl, {
-    query,
+    query: label,
     ready,
     results,
     total,
@@ -344,6 +453,7 @@ async function ensureTag(name) {
 
 async function openTag(id) {
   state.searchQuery = '';
+  state.searchFilters = [];
   state.view = 'tags';
   state.activeCategoryId = null;
   state.tagId = id;
@@ -584,6 +694,7 @@ function updateAddItemAvailability() {
 
 async function selectView(view) {
   state.searchQuery = '';
+  state.searchFilters = [];
   state.tagId = null;
   state.view = view;
   state.activeCategoryId = null;
@@ -593,6 +704,7 @@ async function selectView(view) {
 
 async function selectCategory(id) {
   state.searchQuery = '';
+  state.searchFilters = [];
   state.tagId = null;
   state.view = 'category';
   state.activeCategoryId = id;
@@ -784,6 +896,129 @@ async function setItemTags(item, data, ids) {
   return false;
 }
 
+async function loadOptions() {
+  const result = await withSessionGuard(() => fetchOptions());
+  if (result === null) return;
+  state.options = result;
+}
+
+function renderOptionEditor(container, { kind, title, hint, placeholder, defaults, normalize, invalidMessage }) {
+  container.innerHTML = '';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  const hintEl = document.createElement('p');
+  hintEl.className = 'hint';
+  hintEl.textContent = hint;
+  const chips = document.createElement('div');
+  chips.className = 'option-chips';
+
+  const row = document.createElement('div');
+  row.className = 'input-row';
+  const input = document.createElement('input');
+  input.className = 'input';
+  input.placeholder = placeholder;
+  input.maxLength = 100;
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn btn-primary btn-sm';
+  addBtn.textContent = 'Add';
+  row.appendChild(input);
+  row.appendChild(addBtn);
+
+  const errorEl = document.createElement('div');
+  errorEl.className = 'error-text';
+  errorEl.style.display = 'none';
+  const showError = (message) => {
+    errorEl.textContent = message;
+    errorEl.style.display = message ? 'block' : 'none';
+  };
+
+  function renderChips() {
+    chips.innerHTML = '';
+    const mine = state.options.filter(o => o.kind === kind);
+    if (!mine.length) {
+      const none = document.createElement('p');
+      none.className = 'hint';
+      none.textContent = 'Nothing added yet.';
+      chips.appendChild(none);
+      return;
+    }
+    for (const option of mine) {
+      const chip = document.createElement('span');
+      chip.className = 'option-chip';
+      chip.appendChild(document.createTextNode(option.value));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.title = 'Remove';
+      remove.textContent = '✕';
+      remove.addEventListener('click', async () => {
+        showError('');
+        try {
+          const done = await withSessionGuard(() => deleteOption(option.id));
+          if (done === null) return;
+          state.options = state.options.filter(o => o.id !== option.id);
+          renderChips();
+        } catch (err) {
+          showError(err.message);
+        }
+      });
+      chip.appendChild(remove);
+      chips.appendChild(chip);
+    }
+  }
+
+  async function add() {
+    showError('');
+    const value = normalize(input.value);
+    if (!value) return showError(invalidMessage);
+    const lower = value.toLowerCase();
+    if (defaults.some(d => d.toLowerCase() === lower)) return showError('That one is already in the built-in list.');
+    if (state.options.some(o => o.kind === kind && o.value.toLowerCase() === lower)) return showError('That one is already in your list.');
+
+    addBtn.disabled = true;
+    try {
+      const created = await withSessionGuard(() => createOption({ id: newOptionId(), kind, value }));
+      if (created === null) return;
+      state.options.push(created);
+      input.value = '';
+      renderChips();
+    } catch (err) {
+      showError(err.status === 409 ? 'That one is already in your list.' : err.message);
+    } finally {
+      addBtn.disabled = false;
+    }
+  }
+
+  addBtn.addEventListener('click', add);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      add();
+    }
+  });
+
+  container.appendChild(heading);
+  container.appendChild(hintEl);
+  container.appendChild(chips);
+  container.appendChild(row);
+  container.appendChild(errorEl);
+  renderChips();
+}
+
+function wireEmailAutofill(input, fieldType) {
+  attachAutofill(input, {
+    getSuggestions: (value) => suggestEmails(value, { fieldType, known: knownEmails(), providers: allProviders() }),
+    onPick: (value) => { input.value = value; },
+  });
+}
+
+function wireServiceAutofill(input) {
+  attachAutofill(input, {
+    getSuggestions: (value) => suggestServices(value, allServices()),
+    onPick: (value) => { input.value = value; },
+  });
+}
+
 function fieldInput(field, value) {
   if (field.type === 'integer') {
     const i = document.createElement('input');
@@ -802,13 +1037,33 @@ function fieldInput(field, value) {
     t.value = Array.isArray(value) ? value.join(', ') : '';
     return { el: t, get: () => parseBackupCodes(t.value) };
   }
+  if (field.type === 'secret' && field.subtype === 'multiline') {
+    const t = document.createElement('textarea');
+    t.className = 'textarea';
+    t.placeholder = 'Paste text. Line breaks are kept';
+    t.value = value ?? '';
+    return { el: t, get: () => t.value };
+  }
+
   const i = document.createElement('input');
   i.className = 'input'; i.type = 'text'; i.value = value ?? '';
   if (field.type === 'secret' && field.subtype === 'totp') i.placeholder = 'Base32 secret';
+
+  if (field.type === 'email') {
+    i.placeholder = 'name@example.com';
+    wireEmailAutofill(i, 'email');
+  } else if (field.type === 'service') {
+    i.placeholder = 'e.g. Discord';
+    wireServiceAutofill(i);
+    return { el: i, get: () => canonicalService(i.value, allServices()) };
+  } else if (field.type === 'text') {
+    wireEmailAutofill(i, 'text');
+  }
   return { el: i, get: () => i.value };
 }
 
 function openEditor(item, data, category = activeCategory()) {
+  closeAutofill();
   el.modalBody.innerHTML = '';
 
   const { titleField: titleFieldDef, subtitleField: subtitleFieldDef } = pickTitleFields(category?.fields);
@@ -922,6 +1177,7 @@ function bumpCategoryCount(categoryId, delta) {
 }
 
 function closeEditor() {
+  closeAutofill();
   el.modalBackdrop.style.display = 'none';
 }
 
@@ -1234,6 +1490,33 @@ async function openSettingsModal() {
   `;
   el.settingsModalBody.appendChild(appearance);
 
+  const listsSection = document.createElement('div');
+  listsSection.className = 'settings-section';
+  listsSection.innerHTML = `
+    <div class="settings-section-title">Autofill lists</div>
+    <div class="option-block" id="settings-services"></div>
+    <div class="option-block" id="settings-providers"></div>
+  `;
+  el.settingsModalBody.appendChild(listsSection);
+  renderOptionEditor(listsSection.querySelector('#settings-services'), {
+    kind: 'service',
+    title: 'Services',
+    hint: 'Offered when filling a Service field and when searching with service:. Added to the built-in list.',
+    placeholder: 'e.g. My Bank',
+    defaults: DEFAULT_SERVICES,
+    normalize: normalizeService,
+    invalidMessage: 'Enter a name up to 40 characters.',
+  });
+  renderOptionEditor(listsSection.querySelector('#settings-providers'), {
+    kind: 'email-provider',
+    title: 'Email providers',
+    hint: 'Domains offered after the @ in Email fields. Added to the built-in list.',
+    placeholder: 'e.g. mycompany.com',
+    defaults: DEFAULT_EMAIL_PROVIDERS,
+    normalize: normalizeProvider,
+    invalidMessage: 'Enter a domain such as mycompany.com.',
+  });
+
   const securitySection = document.createElement('div');
   securitySection.className = 'settings-section';
   securitySection.innerHTML = `
@@ -1403,7 +1686,7 @@ function wireSettingsData() {
   document.getElementById('settings-export-btn').addEventListener('click', async () => {
     try {
       const allItems = await fetchItems();
-      const bundle = { exportedAt: new Date().toISOString(), categories: state.categories, tags: state.tags, items: [] };
+      const bundle = { exportedAt: new Date().toISOString(), categories: state.categories, tags: state.tags, options: state.options, items: [] };
       for (const item of allItems) {
         const data = await decryptItemData(item);
         bundle.items.push({ id: item.id, categoryId: item.categoryId, data });
@@ -1444,6 +1727,15 @@ function wireSettingsData() {
       for (const tag of bundle.tags || []) {
         try {
           tagIdMap.set(tag.id, (await ensureTag(tag.name)).id);
+        } catch (e) {}
+      }
+
+      for (const option of bundle.options || []) {
+        const value = option.kind === 'service' ? normalizeService(option.value) : normalizeProvider(option.value);
+        if (!value || !['service', 'email-provider'].includes(option.kind)) continue;
+        if (state.options.some(o => o.kind === option.kind && o.value.toLowerCase() === value.toLowerCase())) continue;
+        try {
+          state.options.push(await createOption({ id: newOptionId(), kind: option.kind, value }));
         } catch (e) {}
       }
 
