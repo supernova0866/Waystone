@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url';
 import argon2 from 'argon2';
 
 import { getClient } from './core/db/turso-client.js';
-import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable } from './core/db/schema.js';
+import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable, ensureTagsTable } from './core/db/schema.js';
 import { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories } from './core/db/categories.js';
 import { ConflictError, createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
+import { TagConflictError, TagNotFoundError, loadTags, createTag, renameTag, deleteTag } from './core/db/tags.js';
 import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
 import { checkRateLimit } from './core/auth/rate-limit.js';
 import {
@@ -257,6 +258,40 @@ async function handleCategoryOrder(req, res) {
   }
 }
 
+async function handleTags(req, res, url) {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const client = getClient();
+
+  if (req.method === 'GET') return sendJson(res, 200, await loadTags(client, user.id));
+
+  if (req.method === 'DELETE') {
+    const id = url.searchParams.get('id');
+    if (!id) return sendJson(res, 400, { error: 'Missing id' });
+    await deleteTag(client, user.id, id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST' || req.method === 'PUT') {
+    const body = await readJsonBody(req);
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (typeof body.id !== 'string' || !body.id) return sendJson(res, 400, { error: 'Missing id' });
+    if (!name || name.length > 32) return sendJson(res, 400, { error: 'Tag names must be 1-32 characters' });
+
+    try {
+      const tag = { id: body.id, name };
+      const result = req.method === 'POST' ? await createTag(client, user.id, tag) : await renameTag(client, user.id, tag);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      if (e instanceof TagConflictError) return sendJson(res, 409, { error: e.message });
+      if (e instanceof TagNotFoundError) return sendJson(res, 404, { error: e.message });
+      throw e;
+    }
+  }
+
+  sendJson(res, 405, { error: 'Method not allowed' });
+}
+
 async function handleItems(req, res, url) {
   const user = await requireUser(req, res);
   if (!user) return;
@@ -340,6 +375,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/change-password' && req.method === 'POST') return await handleChangePassword(req, res);
     if (pathname === '/api/categories/order') return await handleCategoryOrder(req, res);
     if (pathname === '/api/categories') return await handleCategories(req, res, url);
+    if (pathname === '/api/tags') return await handleTags(req, res, url);
     if (pathname === '/api/items') return await handleItems(req, res, url);
 
     if (LEGACY_REDIRECTS[pathname]) return redirect(res, LEGACY_REDIRECTS[pathname]);
@@ -382,6 +418,7 @@ async function boot() {
     await ensureUsersTable(client);
     await ensureCategoriesTable(client);
     await ensureItemsTable(client);
+    await ensureTagsTable(client);
     console.log('Tables ready.');
 
     if (process.env.SEED_ADMIN_USERNAME && process.env.SEED_ADMIN_PASSWORD_HASH && process.env.SEED_ADMIN_SALT) {
