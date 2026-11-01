@@ -74,6 +74,22 @@ async function deleteCategory(categoryId) {
   return request(`/api/categories?id=${encodeURIComponent(categoryId)}`, { method: 'DELETE' });
 }
 
+async function fetchTags() {
+  return request('/api/tags', { method: 'GET' });
+}
+
+async function createTag(tag) {
+  return request('/api/tags', { method: 'POST', body: JSON.stringify(tag) });
+}
+
+async function renameTag(tag) {
+  return request('/api/tags', { method: 'PUT', body: JSON.stringify(tag) });
+}
+
+async function deleteTag(tagId) {
+  return request(`/api/tags?id=${encodeURIComponent(tagId)}`, { method: 'DELETE' });
+}
+
 async function fetchItems(categoryId = null) {
   const qs = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : '';
   return request(`/api/items${qs}`, { method: 'GET' });
@@ -106,6 +122,10 @@ export {
   saveCategory,
   reorderCategories,
   deleteCategory,
+  fetchTags,
+  createTag,
+  renameTag,
+  deleteTag,
   fetchItems,
   createItem,
   saveItem,
