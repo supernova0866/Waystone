@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WayStone — How it works</title>
+
+<script src="/core/client/theme-loader.js"></script>
+<link rel="stylesheet" href="/style/base.css" />
+
+<style>
+  .handbook { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; position: relative; z-index: 1; }
+  .hb-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+  .hb-title { display: flex; align-items: center; gap: 12px; }
+  .hb-title svg { width: 28px; height: 32px; display: block; color: var(--accent); }
+  .hb-title h1 { margin: 0; font-size: 22px; color: var(--text-strong); }
+  .hb-back { font-size: 13px; color: var(--text-muted); text-decoration: none; white-space: nowrap; }
+  .hb-back:hover { color: var(--accent); }
+  .hb-lead { font-size: 15px; line-height: 1.7; color: var(--text); margin: 0 0 32px; }
+  .hb-section { margin-bottom: 36px; }
+  .hb-section h2 {
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted);
+    margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .hb-section p, .hb-section li { font-size: 14px; line-height: 1.7; color: var(--text); }
+  .hb-section p { margin: 0 0 12px; }
+  .hb-section ul { margin: 0 0 12px; padding-left: 20px; }
+  .hb-section li { margin-bottom: 6px; }
+  .hb-section strong { color: var(--text-strong); }
+  .hb-section code { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); }
+  .hb-demo {
+    margin-bottom: 36px; padding: 18px 20px;
+    background: color-mix(in srgb, var(--surface) calc(var(--glass-opacity, 1) * 100%), transparent);
+    backdrop-filter: blur(var(--glass-blur, 0px));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
+    border: 1px solid var(--accent-cycle, var(--accent)); border-radius: var(--radius-lg);
+  }
+  .hb-demo h2 { margin: 0 0 8px; font-size: 16px; color: var(--text-strong); }
+  .hb-demo p { margin: 0 0 14px; font-size: 14px; line-height: 1.6; color: var(--text); }
+  .hb-cred { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .hb-cred-label { width: 86px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .hb-cred-value {
+    flex: 1; padding: 8px 12px; font-family: var(--font-mono); font-size: 14px; color: var(--text-strong);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .hb-demo .btn-primary { margin-top: 10px; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="handbook">
+  <div class="hb-head">
+    <div class="hb-title">
+      <svg viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 1 L18 7 L18 23 L2 23 L2 7 Z" fill="currentColor" opacity="0.15" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M6.5 13.5 L13.5 13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <h1>How WayStone works</h1>
+    </div>
+    <a class="hb-back" href="/">← Back to login</a>
+  </div>
+
+  <p class="hb-lead">
+    WayStone is a private, invite-only vault for passwords, 2FA codes, recovery codes and notes.
+    Everything you store is encrypted in your browser before it is sent anywhere, so the server only ever holds scrambled data.
+  </p>
+
+  <div class="hb-demo" id="demo">
+    <h2>Look around with the demo</h2>
+    <p>
+      The demo shows what WayStone's interface looks like, filled with made-up data, and you can click through all of it.
+      It is read-only and runs <strong>entirely in your browser</strong>: there is no real account behind it, nothing is sent to or stored on the server, and the password is simply checked in the page's code.
+      Nothing in the demo is hashed or encrypted, and refreshing the page signs you out.
+    </p>
+    <p>
+      So treat it as a picture of the interface, not of how the real app works. The real app's protection is described below.
+    </p>
+    <div class="hb-cred">
+      <span class="hb-cred-label">Username</span>
+      <span class="hb-cred-value" id="demo-username"></span>
+      <button class="btn btn-ghost btn-sm" id="demo-copy-username" type="button">Copy</button>
+    </div>
+    <div class="hb-cred">
+      <span class="hb-cred-label">Password</span>
+      <span class="hb-cred-value" id="demo-password"></span>
+      <button class="btn btn-ghost btn-sm" id="demo-copy-password" type="button">Copy</button>
+    </div>
+    <a class="btn btn-primary btn-sm" href="/demo">Open the demo</a>
+  </div>
+
+  <div class="hb-section">
+    <h2>How your data is protected</h2>
+    <ul>
+      <li><strong>Your master password stays in your browser.</strong> It is stretched into an encryption key with PBKDF2 (600,000 rounds), and every item is encrypted with AES-256-GCM before it leaves your device.</li>
+      <li><strong>The server cannot read your items.</strong> It stores the encrypted items and a one-way login proof, which is hashed again with Argon2id. Neither can be turned back into your password or your key.</li>
+      <li><strong>Not everything is encrypted.</strong> Category names, icons and field layouts, which category each item sits in, tag names, your custom autofill lists and timestamps are stored as plain text. Keep that in mind when naming things.</li>
+      <li><strong>There is no password reset.</strong> If you lose your master password, your data cannot be recovered, by you or by anyone else.</li>
+      <li><strong>Lock and Log out are different.</strong> Lock forgets the key on this device and asks for your password again. Log out also ends your session on every device. Reloading the page locks the vault too.</li>
+    </ul>
+  </div>
+
+  <div class="hb-section">
+    <h2>What you can store</h2>
+    <p>Items live in <strong>categories</strong>, and you design each category's fields yourself from the schema editor:</p>
+    <ul>
+      <li><strong>Text, Integer and Rich text</strong> for ordinary details.</li>
+      <li><strong>Email and Service</strong> fields, which offer autofill suggestions as you type.</li>
+      <li><strong>Secret</strong> fields: Password, Multiline (keeps line breaks, good for keys and recovery text), TOTP (a live 2FA code from a Base32 secret) and Backup codes (copy the next one with a click).</li>
+    </ul>
+    <p>The first two non-secret fields become each card's title and subtitle, and secret fields are hidden until you reveal them.</p>
+  </div>
+
+  <div class="hb-section">
+    <h2>Finding things</h2>
+    <ul>
+      <li><strong>Home</strong> shows your favorites, grouped by category, plus a few stats about your vault.</li>
+      <li><strong>Search</strong> on Home looks through titles, subtitles and every non-secret field. Passwords, TOTP secrets, backup codes and multiline secrets are never searched.</li>
+      <li><strong>Filters:</strong> type <code>service:</code>, <code>email:</code> or <code>tag:</code> in the search box to turn a choice into a chip, then add more text if you like.</li>
+      <li><strong>Tags</strong> are labels you create yourself. Add them from the + on any card, then open the Tags tab to see everything with a tag, sorted your way.</li>
+      <li><strong>Autofill lists:</strong> add your own services and email providers in Settings if the built-in ones are missing something.</li>
+    </ul>
+  </div>
+
+  <div class="hb-section">
+    <h2>Good to know</h2>
+    <ul>
+      <li>Saving over a newer version made on another device is blocked, so you won't silently overwrite your own changes.</li>
+      <li>Changing your master password re-encrypts everything in one step. It either fully succeeds or changes nothing, and your other devices are logged out.</li>
+      <li>Export gives you a <strong>decrypted</strong> JSON copy of your vault. Treat that file like the passwords themselves.</li>
+      <li>Sessions last 14 days, and the vault stays locked until you enter your password.</li>
+    </ul>
+  </div>
+</div>
+
+<script type="module" src="/core/client/handbook.js"></script>
+
+</body>
+</html>
