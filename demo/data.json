@@ -1,0 +1,551 @@
+{
+  "exportedAt": "2026-01-05T12:00:00.000Z",
+  "categories": [
+    {
+      "id": "demo-accounts",
+      "name": "Accounts",
+      "icon": "🔑",
+      "sortOrder": 0,
+      "fields": [
+        {
+          "id": "name",
+          "name": "Name",
+          "type": "text"
+        },
+        {
+          "id": "service",
+          "name": "Service",
+          "type": "service"
+        },
+        {
+          "id": "email",
+          "name": "Email",
+          "type": "email"
+        },
+        {
+          "id": "user",
+          "name": "Username",
+          "type": "text",
+          "copyable": true
+        },
+        {
+          "id": "pw",
+          "name": "Password",
+          "type": "secret",
+          "subtype": "password"
+        }
+      ],
+      "itemCount": 6
+    },
+    {
+      "id": "demo-2fa",
+      "name": "2FA Codes",
+      "icon": "🔐",
+      "sortOrder": 1,
+      "fields": [
+        {
+          "id": "name",
+          "name": "Name",
+          "type": "text"
+        },
+        {
+          "id": "user",
+          "name": "Username",
+          "type": "text"
+        },
+        {
+          "id": "secret",
+          "name": "2FA Secret",
+          "type": "secret",
+          "subtype": "totp"
+        }
+      ],
+      "itemCount": 5
+    },
+    {
+      "id": "demo-recovery",
+      "name": "Recovery Codes",
+      "icon": "🛟",
+      "sortOrder": 2,
+      "fields": [
+        {
+          "id": "name",
+          "name": "Name",
+          "type": "text"
+        },
+        {
+          "id": "service",
+          "name": "Service",
+          "type": "service"
+        },
+        {
+          "id": "codes",
+          "name": "Backup codes",
+          "type": "secret",
+          "subtype": "backup-codes"
+        }
+      ],
+      "itemCount": 3
+    },
+    {
+      "id": "demo-notes",
+      "name": "Secure Notes",
+      "icon": "📝",
+      "sortOrder": 3,
+      "fields": [
+        {
+          "id": "title",
+          "name": "Title",
+          "type": "text"
+        },
+        {
+          "id": "notes",
+          "name": "Notes",
+          "type": "rich-text"
+        },
+        {
+          "id": "phrase",
+          "name": "Recovery text",
+          "type": "secret",
+          "subtype": "multiline"
+        }
+      ],
+      "itemCount": 2
+    },
+    {
+      "id": "demo-home",
+      "name": "Home & Devices",
+      "icon": "📶",
+      "sortOrder": 4,
+      "fields": [
+        {
+          "id": "name",
+          "name": "Name",
+          "type": "text"
+        },
+        {
+          "id": "location",
+          "name": "Location",
+          "type": "text"
+        },
+        {
+          "id": "network",
+          "name": "Network",
+          "type": "text",
+          "copyable": true
+        },
+        {
+          "id": "pw",
+          "name": "Password",
+          "type": "secret",
+          "subtype": "password"
+        }
+      ],
+      "itemCount": 4
+    }
+  ],
+  "tags": [
+    {
+      "id": "demo-tag-gaming",
+      "name": "Gaming",
+      "createdAt": "2026-01-05T10:00:00.000Z"
+    },
+    {
+      "id": "demo-tag-work",
+      "name": "Work",
+      "createdAt": "2026-01-05T10:01:00.000Z"
+    },
+    {
+      "id": "demo-tag-personal",
+      "name": "Personal",
+      "createdAt": "2026-01-05T10:02:00.000Z"
+    },
+    {
+      "id": "demo-tag-finance",
+      "name": "Finance",
+      "createdAt": "2026-01-05T10:03:00.000Z"
+    },
+    {
+      "id": "demo-tag-shared",
+      "name": "Shared",
+      "createdAt": "2026-01-05T10:04:00.000Z"
+    }
+  ],
+  "options": [
+    {
+      "id": "demo-opt-1",
+      "kind": "service",
+      "value": "Acme Portal"
+    },
+    {
+      "id": "demo-opt-2",
+      "kind": "service",
+      "value": "Demo Bank"
+    },
+    {
+      "id": "demo-opt-3",
+      "kind": "email-provider",
+      "value": "example.com"
+    }
+  ],
+  "items": [
+    {
+      "id": "demo-i-discord",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Discord",
+        "subtitle": "Discord",
+        "fields": {
+          "name": "Discord",
+          "service": "Discord",
+          "email": "dummy.user@example.com",
+          "user": "DummyUser#0001",
+          "pw": "not-a-real-password-01"
+        },
+        "favorite": true,
+        "tags": [
+          "demo-tag-gaming",
+          "demo-tag-personal"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-steam",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Steam",
+        "subtitle": "Steam",
+        "fields": {
+          "name": "Steam",
+          "service": "Steam",
+          "email": "dummy.user+games@example.com",
+          "user": "dummy_gamer",
+          "pw": "not-a-real-password-02"
+        },
+        "favorite": true,
+        "tags": [
+          "demo-tag-gaming"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-epic",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Epic Games",
+        "subtitle": "Epic Games",
+        "fields": {
+          "name": "Epic Games",
+          "service": "Epic Games",
+          "email": "dummy.user+games@example.com",
+          "user": "DummyEpic",
+          "pw": "not-a-real-password-03"
+        },
+        "tags": [
+          "demo-tag-gaming",
+          "demo-tag-shared"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-netflix",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Netflix",
+        "subtitle": "Netflix",
+        "fields": {
+          "name": "Netflix",
+          "service": "Netflix",
+          "email": "dummy.user@example.com",
+          "user": "dummy.user@example.com",
+          "pw": "not-a-real-password-04"
+        },
+        "tags": [
+          "demo-tag-personal",
+          "demo-tag-shared"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-intranet",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Company intranet",
+        "subtitle": "Acme Portal",
+        "fields": {
+          "name": "Company intranet",
+          "service": "Acme Portal",
+          "email": "d.user@example.org",
+          "user": "duser",
+          "pw": "not-a-real-password-05"
+        },
+        "tags": [
+          "demo-tag-work"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-bank",
+      "categoryId": "demo-accounts",
+      "data": {
+        "title": "Online banking",
+        "subtitle": "Demo Bank",
+        "fields": {
+          "name": "Online banking",
+          "service": "Demo Bank",
+          "email": "dummy.user@example.com",
+          "user": "0000-DEMO-1234",
+          "pw": "not-a-real-password-06"
+        },
+        "tags": [
+          "demo-tag-finance"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-2fa-discord",
+      "categoryId": "demo-2fa",
+      "data": {
+        "title": "Discord",
+        "subtitle": "DummyUser#0001",
+        "fields": {
+          "name": "Discord",
+          "user": "DummyUser#0001",
+          "secret": "JBSWY3DPEHPK3PXP"
+        },
+        "favorite": true,
+        "tags": [
+          "demo-tag-gaming"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-2fa-github",
+      "categoryId": "demo-2fa",
+      "data": {
+        "title": "GitHub",
+        "subtitle": "dummy-user",
+        "fields": {
+          "name": "GitHub",
+          "user": "dummy-user",
+          "secret": "GEZDGNBVGY3TQOJQ"
+        },
+        "favorite": true,
+        "tags": [
+          "demo-tag-work"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-2fa-google",
+      "categoryId": "demo-2fa",
+      "data": {
+        "title": "Google",
+        "subtitle": "dummy.user@example.com",
+        "fields": {
+          "name": "Google",
+          "user": "dummy.user@example.com",
+          "secret": "MFRGGZDFMZTWQ2LK"
+        },
+        "tags": [
+          "demo-tag-personal"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-2fa-microsoft",
+      "categoryId": "demo-2fa",
+      "data": {
+        "title": "Microsoft",
+        "subtitle": "d.user@example.org",
+        "fields": {
+          "name": "Microsoft",
+          "user": "d.user@example.org",
+          "secret": "KRSXG5CTMVRXEZLU"
+        },
+        "tags": [
+          "demo-tag-work"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-2fa-epic",
+      "categoryId": "demo-2fa",
+      "data": {
+        "title": "Epic Games",
+        "subtitle": "DummyEpic",
+        "fields": {
+          "name": "Epic Games",
+          "user": "DummyEpic",
+          "secret": "ONSWG4TFOQYTEMZU"
+        },
+        "tags": [
+          "demo-tag-gaming"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-rec-github",
+      "categoryId": "demo-recovery",
+      "data": {
+        "title": "GitHub recovery",
+        "subtitle": "GitHub",
+        "fields": {
+          "name": "GitHub recovery",
+          "service": "GitHub",
+          "codes": [
+            "demo-0001-aaaa",
+            "demo-0002-bbbb",
+            "demo-0003-cccc",
+            "demo-0004-dddd",
+            "demo-0005-eeee",
+            "demo-0006-ffff"
+          ]
+        },
+        "tags": [
+          "demo-tag-work"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-rec-google",
+      "categoryId": "demo-recovery",
+      "data": {
+        "title": "Google recovery",
+        "subtitle": "Google",
+        "fields": {
+          "name": "Google recovery",
+          "service": "Google",
+          "codes": [
+            "1111-2222",
+            "3333-4444",
+            "5555-6666",
+            "7777-8888"
+          ]
+        },
+        "tags": [
+          "demo-tag-personal"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-rec-discord",
+      "categoryId": "demo-recovery",
+      "data": {
+        "title": "Discord recovery",
+        "subtitle": "Discord",
+        "fields": {
+          "name": "Discord recovery",
+          "service": "Discord",
+          "codes": [
+            "dc-demo-01",
+            "dc-demo-02",
+            "dc-demo-03"
+          ]
+        },
+        "tags": [
+          "demo-tag-gaming"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-note-ssh",
+      "categoryId": "demo-notes",
+      "data": {
+        "title": "Home server key",
+        "subtitle": "Demo note. Multiline secrets keep their line breaks when you reveal or copy them.",
+        "fields": {
+          "title": "Home server key",
+          "notes": "Demo note. Multiline secrets keep their line breaks when you reveal or copy them.",
+          "phrase": "-----BEGIN DEMO KEY-----\nthis-is-not-a-real-key\nit-only-exists-for-the-demo\n-----END DEMO KEY-----"
+        },
+        "tags": [
+          "demo-tag-personal"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-note-wallet",
+      "categoryId": "demo-notes",
+      "data": {
+        "title": "Practice recovery phrase",
+        "subtitle": "Twelve ordinary words, nothing to do with any real wallet.",
+        "fields": {
+          "title": "Practice recovery phrase",
+          "notes": "Twelve ordinary words, nothing to do with any real wallet.",
+          "phrase": "apple banana cherry delta echo forest garden harbor island jungle kettle lemon"
+        },
+        "tags": [
+          "demo-tag-finance"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-wifi-home",
+      "categoryId": "demo-home",
+      "data": {
+        "title": "Home Wi-Fi",
+        "subtitle": "Living room",
+        "fields": {
+          "name": "Home Wi-Fi",
+          "location": "Living room",
+          "network": "DemoHome-5G",
+          "pw": "demo-wifi-password"
+        },
+        "favorite": true,
+        "tags": [
+          "demo-tag-personal",
+          "demo-tag-shared"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-wifi-guest",
+      "categoryId": "demo-home",
+      "data": {
+        "title": "Guest Wi-Fi",
+        "subtitle": "Living room",
+        "fields": {
+          "name": "Guest Wi-Fi",
+          "location": "Living room",
+          "network": "DemoHome-Guest",
+          "pw": "welcome-guest-demo"
+        },
+        "tags": [
+          "demo-tag-shared"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-router",
+      "categoryId": "demo-home",
+      "data": {
+        "title": "Router admin",
+        "subtitle": "Hallway",
+        "fields": {
+          "name": "Router admin",
+          "location": "Hallway",
+          "network": "192.168.0.1",
+          "pw": "demo-router-admin"
+        },
+        "tags": [
+          "demo-tag-personal"
+        ]
+      }
+    },
+    {
+      "id": "demo-i-tv",
+      "categoryId": "demo-home",
+      "data": {
+        "title": "Smart TV",
+        "subtitle": "Bedroom",
+        "fields": {
+          "name": "Smart TV",
+          "location": "Bedroom",
+          "network": "DemoHome-5G",
+          "pw": "demo-tv-pin-0000"
+        }
+      }
+    }
+  ]
+}
