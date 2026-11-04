@@ -9,6 +9,7 @@ import { getClient } from './core/db/turso-client.js';
 import { ensureUsersTable, ensureCategoriesTable, ensureItemsTable, ensureTagsTable, ensureOptionsTable } from './core/db/schema.js';
 import { createCategory, saveCategory, reorderCategories, deleteCategory, loadCategories } from './core/db/categories.js';
 import { ConflictError, createItem, saveItem, deleteItem, loadItems } from './core/db/items.js';
+import { buildDemoPage, demoCsp } from './demo/page.js';
 import { TagConflictError, TagNotFoundError, loadTags, createTag, renameTag, deleteTag } from './core/db/tags.js';
 import { OptionConflictError, normalizeOption, loadOptions, createOption, deleteOption } from './core/db/options.js';
 import { createSessionCookie, getSessionInfo } from './core/auth/session.js';
@@ -173,7 +174,7 @@ async function handleSessionCheck(req, res) {
   const info = getSessionInfo(req);
   if (!info) return sendJson(res, 200, { authenticated: false });
   const user = await findById(getClient(), info.userId);
-  if (!user || Number(user.session_version) !== info.sessionVersion) return sendJson(res, 200, { authenticated: false });
+  if (!user || user.status !== 'active' || Number(user.session_version) !== info.sessionVersion) return sendJson(res, 200, { authenticated: false });
   sendJson(res, 200, { authenticated: true, userId: user.id, username: user.username, role: user.role, salt: user.pbkdf2_salt, loginCount: Number(user.login_count) || 0, commit: DEPLOYED_COMMIT });
 }
 
@@ -410,6 +411,13 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/options') return await handleOptions(req, res, url);
     if (pathname === '/api/items') return await handleItems(req, res, url);
 
+    if (pathname === '/demo' || pathname === '/demo/') {
+      const html = await buildDemoPage(path.join(__dirname, 'index.html'));
+      res.setHeader('Content-Security-Policy', demoCsp(SECURITY_HEADERS['Content-Security-Policy']));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    }
+
     if (LEGACY_REDIRECTS[pathname]) return redirect(res, LEGACY_REDIRECTS[pathname]);
 
     if (pathname === '/') {
@@ -430,6 +438,7 @@ const server = http.createServer(async (req, res) => {
 
     if (
       pathname.startsWith('/style/') ||
+      pathname.startsWith('/demo/') ||
       pathname.startsWith('/assets/') ||
       pathname.startsWith('/core/client/')
     ) {
