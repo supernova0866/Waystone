@@ -1,6 +1,6 @@
 const PINNED = [
   { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'tags', icon: '🏷', label: 'Tags' },
+  { id: 'tags', icon: '🏷️', label: 'Tags' },
 ];
 
 function renderPinnedList(container, activeView, onSelect) {
