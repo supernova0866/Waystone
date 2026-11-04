@@ -1,0 +1,24 @@
+.demo-banner {
+  flex-shrink: 0;
+  padding: 7px 24px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.demo-page #login-gate a[href="/invite"],
+.demo-page #login-gate a[href="/handbook#demo"] { display: none; }
+
+.read-only #add-item-btn,
+.read-only #edit-schema-btn,
+.read-only #add-category-btn,
+.read-only #add-tag-btn,
+.read-only .tag-add-btn,
+.read-only .tag-list-remove,
+.read-only .tag-card-actions,
+.read-only .item-card-icon-btn[title="Edit"],
+.read-only .search-result-actions button[title="Edit"] { display: none !important; }
+
+.read-only .favorite-btn { pointer-events: none; }
+.read-only .tab-grip { visibility: hidden; pointer-events: none; }
