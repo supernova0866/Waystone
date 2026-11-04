@@ -7,3 +7,6 @@ A self-contained, front-end-only demo of the WayStone interface, served at `/dem
 - `data.json` uses the same format as the Export button. Items are stored as plain JSON in memory.
 - Credentials live in `config.js`, which the handbook page also reads.
 - Writes are refused (`api.js`), and `demo.css` hides the controls that would attempt them.
+
+> [!NOTE]
+> This is only meant to showcase the UI features and Layout, Not the full architecture. Expect Accordingly.
