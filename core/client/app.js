@@ -14,6 +14,7 @@ import { initParticles, setParticlesEnabled, refreshParticlesForTheme } from '/c
 const state = {
   username: null,
   role: null,
+  readOnly: false,
   loginCount: 0,
   commit: '',
   searchQuery: '',
@@ -41,6 +42,7 @@ const el = {
   loginUsername: document.getElementById('login-username'),
   loginPassword: document.getElementById('login-password'),
   loginSubmit: document.getElementById('login-submit'),
+  demoBanner: document.getElementById('demo-banner'),
 
   unlockGate: document.getElementById('unlock-gate'),
   unlockForm: document.getElementById('unlock-form'),
@@ -85,6 +87,13 @@ const el = {
   viewModalBody: document.getElementById('view-modal-body'),
   viewModalClose: document.getElementById('view-modal-close'),
 };
+
+function applyRole(role) {
+  state.role = role;
+  state.readOnly = role === 'demo';
+  document.body.classList.toggle('read-only', state.readOnly);
+  el.demoBanner?.classList.toggle('hidden', !state.readOnly);
+}
 
 function hideAllGates() {
   el.loginGate.style.display = 'none';
@@ -717,6 +726,10 @@ function activeCategory() {
 }
 
 setReorderHandler(async (ids) => {
+  if (state.readOnly) {
+    renderSidebarList(el.sidebarList, state.categories, state.activeCategoryId, selectCategory);
+    return;
+  }
   const previous = state.categories;
   state.categories = ids.map(id => previous.find(c => c.id === id)).filter(Boolean);
   state.categories.forEach((c, i) => { c.sortOrder = i; });
@@ -830,6 +843,7 @@ function syncIndex(row, enc, data) {
 async function consumeBackupCode(item, data, field, codes) {
   const { code, remaining } = consumeCode(codes || []);
   if (code) navigator.clipboard?.writeText(code).catch(() => {});
+  if (state.readOnly) return codes || [];
   data.fields[field.id] = remaining;
   try {
     const enc = await encryptItemData(data);
@@ -1490,6 +1504,16 @@ async function openSettingsModal() {
   `;
   el.settingsModalBody.appendChild(appearance);
 
+  if (state.readOnly) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = 'This is the read-only demo, so only appearance settings are available.';
+    el.settingsModalBody.appendChild(note);
+    await wireSettingsAppearance();
+    el.settingsModalBackdrop.style.display = 'flex';
+    return;
+  }
+
   const listsSection = document.createElement('div');
   listsSection.className = 'settings-section';
   listsSection.innerHTML = `
@@ -1937,7 +1961,7 @@ async function performLogout() {
   await logout().catch(() => {});
   lockVault();
   state.username = null;
-  state.role = null;
+  applyRole(null);
   resetState();
   showLoginGate();
 }
@@ -1979,7 +2003,7 @@ el.loginForm.addEventListener('submit', async (e) => {
     const result = await login(username, authProof);
     await unlockVault(password, result.salt);
     state.username = result.username;
-    state.role = result.role;
+    applyRole(result.role);
     state.loginCount = result.loginCount || 0;
     state.commit = result.commit || '';
     await showApp();
@@ -2002,7 +2026,7 @@ el.unlockForm.addEventListener('submit', async (e) => {
     if (!session.authenticated) { handleSessionExpired(); return; }
     await unlockVault(password, session.salt);
     state.username = session.username;
-    state.role = session.role;
+    applyRole(session.role);
     state.loginCount = session.loginCount || 0;
     state.commit = session.commit || '';
     await showApp();
@@ -2023,7 +2047,7 @@ async function boot() {
   }
 
   state.username = session.username;
-  state.role = session.role;
+  applyRole(session.role);
   state.loginCount = session.loginCount || 0;
   state.commit = session.commit || '';
 
